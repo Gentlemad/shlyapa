@@ -42,6 +42,14 @@ function build(){
     console.warn("Предупреждение: блок рельсы не найден, проверьте разметку");
   }
 
+  // Фейковая клавиатура - тоже часть корпуса прототипа. На телефоне поле
+  // поднимает системную клавиатуру, и вторая поверх неё только мешает.
+  const beforeKb = body.length;
+  body = body.replace(/\s*<div class="kb" id="kb"><\/div>/, "");
+  if(body.length === beforeKb){
+    console.warn("Предупреждение: блок клавиатуры не найден, проверьте разметку");
+  }
+
   const out =
 `<!doctype html>
 <html lang="ru">

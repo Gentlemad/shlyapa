@@ -69,8 +69,11 @@
     border-radius:8px;padding:9px 10px;font-size:12.5px;font-weight:600;cursor:pointer}
   .railnote{font-size:11px;line-height:1.35;color:var(--bench-ink);opacity:.72}
 
-  .stage{flex:1;min-width:0;min-height:0;overflow:hidden;display:grid;place-items:center;padding:14px}
-  .phone{position:relative;width:min(390px,100%);height:100%;max-height:844px;
+  /* дорожки задаём явно: у авторазмерной строки height:100% корпуса ссылается
+     сам на себя, ссылка закольцовывается, и корпус вытягивается под контент */
+  .stage{flex:1;min-width:0;min-height:0;overflow:hidden;display:grid;place-items:center;padding:14px;
+    grid-template-rows:minmax(0,1fr);grid-template-columns:minmax(0,1fr)}
+  .phone{position:relative;width:min(390px,100%);height:100%;max-height:844px;min-height:0;
     background:#000;border-radius:44px;padding:9px;
     box-shadow:0 2px 3px rgba(0,0,0,.18), 0 22px 50px rgba(20,24,32,.32);display:flex}
   .island{position:absolute;top:19px;left:50%;transform:translateX(-50%);
@@ -94,11 +97,14 @@
       radial-gradient(circle at 86% 84%, rgba(31,111,235,.12), rgba(31,111,235,0) 44%)}
   #app.playing .ctx{background:transparent}
 
-  /* точки живут отдельным слоем и медленно дрейфуют */
-  #app > .dotlayer{position:absolute;inset:0;z-index:0;pointer-events:none;
+  /* Точки живут отдельным слоем и медленно дрейфуют. Двигаем слой трансформом,
+     а не background-position: перерисовка фона на каждом кадре телефону дорога,
+     и дрейф на нём вставал. Слой с запасом по краям, чтобы сдвиг не оголял угол. */
+  #app > .dotlayer{position:absolute;inset:-48px;z-index:0;pointer-events:none;
     background-image:radial-gradient(circle at 1.4px 1.4px, rgba(31,111,235,.11) 1.4px, transparent 0);
-    background-size:20px 20px;animation:drift 16s linear infinite}
-  @keyframes drift{from{background-position:0 0}to{background-position:20px 40px}}
+    background-size:20px 20px;animation:drift 9s linear infinite;will-change:transform}
+  /* шаг кратен клетке, поэтому цикл замыкается без рывка */
+  @keyframes drift{from{transform:translate3d(0,0,0)}to{transform:translate3d(20px,40px,0)}}
 
   /* мягкая смена экранов */
   .screen.enter{animation:scrIn .24s cubic-bezier(.2,.7,.3,1)}
@@ -172,7 +178,8 @@
   .pairbox .pra svg{width:15px;height:15px}
 
   .tfrow{display:flex;gap:8px;align-items:stretch;height:42px}
-  .tf{flex:1;min-width:0;height:42px;font-family:var(--ui);font-size:15px;padding:0 13px;color:var(--ink);
+  /* 16px обязательны: на меньшем кегле Safari на айфоне зумит страницу при фокусе */
+  .tf{flex:1;min-width:0;height:42px;font-family:var(--ui);font-size:16px;padding:0 13px;color:var(--ink);
     background:rgba(20,24,32,.05);border:1px solid transparent;border-radius:11px}
   .tf:focus{outline:none;border-color:var(--accent);background:var(--raise)}
   .tf:disabled{opacity:.5}
@@ -492,7 +499,6 @@
         <div class="overlay" id="o-flash" hidden><div class="flash" id="flash-inner"></div></div>
         <div class="overlay" id="o-sheet" hidden><div id="sheet-inner" style="flex:1;min-height:0;display:flex;flex-direction:column"></div></div>
         <div class="overlay" id="o-roster" hidden><div id="roster-inner" style="flex:1;min-height:0;display:flex;flex-direction:column"></div></div>
-        <div class="kb" id="kb"></div>
         <div class="scrollthumb" id="scrollthumb"></div>
       </div>
     </div>
@@ -792,8 +798,15 @@ var KB_NUMS = [
 ];
 var kbTarget=null, kbShift=false, kbNums=false;
 
+/* Фейковая клавиатура - часть корпуса прототипа: внутри артефакта системной нет.
+   В приложении поле поднимает настоящую клавиатуру устройства, и вторая поверх
+   неё только мешает. В боевой сборке узла #kb нет вовсе, отсюда проверки. */
+function kbOff(){
+  return !byId("kb") || document.body.classList.contains("appmode");
+}
 function kbRender(){
   var kb = byId("kb"), rows = kbNums ? KB_NUMS : KB_LETTERS, html = "";
+  if(!kb) return;
   rows.forEach(function(r, ri){
     var keys = r.map(function(ch){
       var label = (!kbNums && kbShift) ? ch.toUpperCase() : ch;
@@ -848,6 +861,7 @@ function kbGo(){
   el.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true}));
 }
 function kbShow(el){
+  if(kbOff()) return;
   kbTarget=el; kbShift=false; kbNums=false;
   kbRender();
   byId("kb").classList.add("up");
@@ -856,8 +870,8 @@ function kbShow(el){
 }
 function kbHide(){
   kbTarget=null;
-  byId("kb").classList.remove("up");
-  byId("screenarea").classList.remove("kbopen");
+  var kb=byId("kb"); if(kb) kb.classList.remove("up");
+  var sa=byId("screenarea"); if(sa) sa.classList.remove("kbopen");
 }
 document.addEventListener("focusin", function(e){
   if(e.target && e.target.classList && e.target.classList.contains("tf")) kbShow(e.target);
@@ -1422,6 +1436,8 @@ function startTurn(){
     remainingMs:(S.carryMs!==null?S.carryMs:S.settings.turnSeconds*1000),
     startMs:S.settings.turnSeconds*1000, items:[], current:null, streak:0};
   S.carryMs=null;
+  // Предыдущая пара могла разобрать шляпу до дна: для новой пары свободны все слова
+  if(S.round===3 && !S.hat.length) S.hat=round3Refill();
   drawWord();
   S.wordShownAt=Date.now();
   S.phase="turn";
@@ -1515,6 +1531,22 @@ document.addEventListener("keydown", function(e){
   if(S && S.phase==="turn" && (e.code==="Space"||e.code==="ArrowUp")){ e.preventDefault(); flyOut(); }
 });
 
+/* Третий раунд длится фиксированное число ходов, а не до последнего слова,
+   поэтому опустевшая шляпа в нём пополняется. Возвращаем в неё только те слова,
+   которых пара ещё не касалась в этом раунде: дважды отгадать одно и то же
+   слово нельзя, и больше слов, чем есть в игре, пара за ход не наберёт. */
+function round3Refill(){
+  var played={};
+  if(S.turn) S.turn.items.forEach(function(i){ if(i.round===3) played[i.wordId]=true; });
+  return shuffle(allIds().filter(function(id){ return !played[id]; }));
+}
+/* Пара разобрала все слова до конца времени: предъявлять больше нечего,
+   ход закрывается досрочно. */
+function hatEmptied(){
+  stopTimer();
+  buzz([60,40,60]);
+  endTurn();
+}
 function markGuessed(){
   if(S.phase!=="turn" || !S.turn || !S.turn.current) return;
   var gap = Date.now() - (S.wordShownAt || Date.now());
@@ -1528,7 +1560,8 @@ function markGuessed(){
 
   if(S.hat.length===0){
     if(S.round<3){ roundBoundary(); return; }
-    S.hat=shuffle(allIds());
+    S.hat=round3Refill();
+    if(!S.hat.length){ hatEmptied(); return; }
   }
   drawWord();
   S.wordShownAt=Date.now();
