@@ -727,7 +727,7 @@ var STORE = "shlyapa.mvp.v9";
    ============================================================ */
 var FEEDBACK_URL = "https://shlyapa-feedback.grudanovartyom.workers.dev";
 var TELEGRAM_URL = "https://t.me/gentlemad";
-var BUILD = "2026-09-19 15:58 UTC";                 /* сюда build.js подставляет отметку сборки */
+var BUILD = "2026-09-19 16:08 UTC";                 /* сюда build.js подставляет отметку сборки */
 var FB_STORE = "shlyapa.fb.v1";
 var FB_MIN = 5, FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
 /* Счётчик символов висит на экране без дела: показываем, только когда
@@ -2189,10 +2189,9 @@ function anAsk(){
      настраивать в ней было бы нечего. */
   inner.innerHTML =
     '<div class="cbox">'+
-      '<div class="ct">Данные и cookie</div>'+
-      '<p class="cp">Приложение собирает данные о ходе партии, включая имена '+
-        'игроков и придуманные слова, чтобы автор мог его дорабатывать. '+
-        'Аналитика работает через Яндекс Метрику, она сохраняет cookie.</p>'+
+      '<div class="ct">Мы используем cookie</div>'+
+      '<p class="cp">И собираем статистику о том, как проходит игра, чтобы её '+
+        'дорабатывать. Состав данных и порядок удаления - в политике.</p>'+
       '<div class="cbtns">'+
         '<button class="cbtn cyes" id="cons-yes">Принять</button>'+
         '<button class="cbtn cno" id="cons-no">Отклонить</button>'+
