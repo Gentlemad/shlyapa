@@ -3043,6 +3043,18 @@ function beep(){
   }catch(e){}
 }
 
+/* ?fresh - открыть как будто впервые: чистит ответ про статистику и
+   незаконченную партию. Нужно для обкатки первого запуска: вопрос задаётся
+   один раз на устройство, и без сброса баннер больше никогда не покажется.
+   В артефакте адрес не наш, поэтому там тот же эффект даёт приватное окно. */
+(function(){
+  var q = (location.search + location.hash).toLowerCase();
+  if(q.indexOf("fresh") < 0) return;
+  try{ localStorage.removeItem(AN_STORE); }catch(e){}
+  try{ localStorage.removeItem(STORE); }catch(e){}
+  try{ localStorage.removeItem(FB_STORE + ".last"); }catch(e){}
+})();
+
 /* ?app - только продукт, без рельсы и корпуса: так его можно открыть на телефоне */
 (function(){
   var q = (location.search + location.hash).toLowerCase();
@@ -3051,7 +3063,19 @@ function beep(){
 
 (function(){
   var r = byId("dev-reset");
-  if(r) r.onclick = function(){ devJump((S&&S.devState)||"home"); };
+  if(!r) return;
+  r.onclick = function(){ devJump((S&&S.devState)||"home"); };
+  /* Вторая кнопка рядом: вернуть вопрос про статистику. Отдельная, потому
+     что сброс состояния и сброс онбординга - разные намерения. */
+  var b = document.createElement("button");
+  b.className = "railreset";
+  b.textContent = "Спросить про статистику заново";
+  b.onclick = function(){
+    try{ localStorage.removeItem(AN_STORE); }catch(e){}
+    AN.ok = null; AN.q = []; AN.install = ""; AN.sit = "";
+    anInit();
+  };
+  r.parentNode.insertBefore(b, r.nextSibling);
 })();
 
 function boot(hot){
