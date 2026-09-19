@@ -329,14 +329,20 @@
   .consent .ct{font-size:14.5px;font-weight:700;letter-spacing:-.01em;margin-bottom:3px}
   .consent .cp{font-size:12.5px;line-height:1.42;color:var(--muted);margin:0 0 11px}
   .consent .cp a{color:var(--accent);text-decoration:none;font-weight:600;white-space:nowrap}
-  .consent .cbtns{display:flex;gap:7px;align-items:center}
-  .consent .cyes{flex:1;min-width:0;height:40px;border:0;border-radius:11px;
-    background:var(--accent);color:#fff;font-family:var(--ui);
-    font-size:14.5px;font-weight:600;cursor:pointer}
+  /* Кнопки равнозначны намеренно: закон требует, чтобы отказ был не мельче
+     и не бледнее согласия. Отказ, спрятанный в серую ссылку под яркой
+     кнопкой, делает согласие недействительным. Отсюда одинаковые ширина,
+     высота, кегль и насыщенность - различаются только заливкой. */
+  .consent .cbtns{display:flex;gap:8px}
+  .consent .cbtn{flex:1 1 0;min-width:0;height:42px;border-radius:11px;
+    font-family:var(--ui);font-size:14.5px;font-weight:600;cursor:pointer;
+    border:1px solid var(--accent)}
+  .consent .cyes{background:var(--accent);color:#fff}
   .consent .cyes:active{background:#1b61ce}
-  .consent .cno{flex:none;height:40px;padding:0 13px;border:0;background:none;
-    color:var(--muted);font-family:var(--ui);font-size:14px;font-weight:600;cursor:pointer}
-  .consent .cno:active{background:rgba(20,24,32,.06);border-radius:11px}
+  .consent .cno{background:transparent;color:var(--accent)}
+  .consent .cno:active{background:var(--accent-soft)}
+  .consent .clink{display:block;margin-top:9px;text-align:center;
+    font-size:12.5px;color:var(--muted);text-decoration:underline}
   /* Пока баннер висит, экран поджимается на его высоту: иначе он ложится
      поверх нижних кнопок, а на главной это кнопка "Создать игру".
      Высоту меряем в JS и кладём в --conh: текст переносится по-разному. */
@@ -721,7 +727,7 @@ var STORE = "shlyapa.mvp.v9";
    ============================================================ */
 var FEEDBACK_URL = "https://shlyapa-feedback.grudanovartyom.workers.dev";
 var TELEGRAM_URL = "https://t.me/gentlemad";
-var BUILD = "2026-09-19 15:42 UTC";                 /* сюда build.js подставляет отметку сборки */
+var BUILD = "2026-09-19 15:58 UTC";                 /* сюда build.js подставляет отметку сборки */
 var FB_STORE = "shlyapa.fb.v1";
 var FB_MIN = 5, FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
 /* Счётчик символов висит на экране без дела: показываем, только когда
@@ -2054,7 +2060,7 @@ function anInit(){
   anPatch({install:d.install, sit:d.sit, seen:now, q:AN.q, open:lost ? null : (d.open||null)});
 
   if(AN.ok === true) anStart(first, lost);
-  else if(AN.ok === null) anAsk(first, lost);
+  else if(AN.ok === null) AN._pending = {first: !!first, lost: lost || null};
 }
 
 function anStart(first, lost){
@@ -2174,30 +2180,50 @@ function anGoal(name){
 /* Один вопрос на устройство, при первом открытии, и он перечисляет весь
    состав сразу. Дробить на несколько согласий нельзя: каждое следующее
    окно люди закрывают не читая, и толку от него нет никому. */
-function anAsk(first, lost){
-  AN._pending = {first: !!first, lost: lost || null};
+function anAsk(){
   var inner = byId("consent-inner");
   if(!inner) return;
-  /* Коротко и без запугивания: состав назван одной строкой, всё остальное
-     живёт за ссылкой. Длинный текст в баннере всё равно не читают. */
+  /* Формулировка по сложившемуся образцу, а не своя: что собираем, зачем,
+     кто обрабатывает, ссылка на политику, два равнозначных действия.
+     Категорий здесь одна - аналитика, поэтому кнопки "Настроить" нет:
+     настраивать в ней было бы нечего. */
   inner.innerHTML =
     '<div class="cbox">'+
-      '<div class="ct">Помочь доработать игру?</div>'+
-      '<p class="cp">Приложение пришлёт разработчику, как прошла партия: тайминги, '+
-        'имена игроков и придуманные слова. Отказ ничего не ломает.'+
-        (PRIVACY_URL ? ' <a href="'+PRIVACY_URL+'" target="_blank" rel="noopener">Подробнее</a>' : '')+
-      '</p>'+
+      '<div class="ct">Данные и cookie</div>'+
+      '<p class="cp">Приложение собирает данные о ходе партии, включая имена '+
+        'игроков и придуманные слова, чтобы автор мог его дорабатывать. '+
+        'Аналитика работает через Яндекс Метрику, она сохраняет cookie.</p>'+
       '<div class="cbtns">'+
-        '<button class="cyes" id="cons-yes">Хорошо</button>'+
-        '<button class="cno" id="cons-no">Не надо</button>'+
+        '<button class="cbtn cyes" id="cons-yes">Принять</button>'+
+        '<button class="cbtn cno" id="cons-no">Отклонить</button>'+
       '</div>'+
+      (PRIVACY_URL ? '<a class="clink" href="'+PRIVACY_URL+'" target="_blank" '+
+        'rel="noopener">Политика обработки данных</a>' : '')+
     '</div>';
   byId("cons-yes").onclick = function(){ anAnswer(true); };
   byId("cons-no").onclick = function(){ anAnswer(false); };
-  byId("o-consent").hidden = false;
-  byId("app").classList.add("consenting");
-  anMeasure();
-  window.addEventListener("resize", anMeasure);
+}
+
+/* Спрашиваем только на главной: это единственный экран, где человек ничего
+   не делает и может прочитать. Во время настройки, ввода слов и тем более
+   хода баннер был бы помехой посреди дела. Ушли с главной не ответив -
+   баннер уходит вместе с экраном и ждёт следующего возвращения. */
+function anGate(){
+  var el = byId("o-consent");
+  if(!el) return;
+  var want = (AN.ok === null && S && S.phase === "home" && (EVENTS_URL || METRIKA_ID));
+  if(want === !el.hidden) return;
+  if(want){
+    anAsk();
+    el.hidden = false;
+    byId("app").classList.add("consenting");
+    anMeasure();
+    window.addEventListener("resize", anMeasure);
+  } else {
+    el.hidden = true;
+    byId("app").classList.remove("consenting");
+    window.removeEventListener("resize", anMeasure);
+  }
 }
 /* Высота баннера вместе с отступом: её занимает нижний край экрана */
 function anMeasure(){
@@ -2209,14 +2235,12 @@ function anMeasure(){
   requestAnimationFrame(syncSticky);
 }
 function anAnswer(ok){
-  byId("o-consent").hidden = true;
-  byId("app").classList.remove("consenting");
-  window.removeEventListener("resize", anMeasure);
-  requestAnimationFrame(syncSticky);
   anPatch({ok: !!ok});
   AN.ok = !!ok;
   var p = AN._pending || {};
   AN._pending = null;
+  anGate();
+  requestAnimationFrame(syncSticky);
   if(ok){
     anStart(p.first, p.lost);
     track("consent", {ok:true});
@@ -2993,6 +3017,7 @@ function go(){
     anHit(S.phase);
     track("screen", {n:S.phase});
   }
+  anGate();
 
   renderBar(); renderCtx(); renderProgress(); renderDev(); save();
   requestAnimationFrame(syncSticky);
@@ -3074,7 +3099,7 @@ function beep(){
   b.onclick = function(){
     try{ localStorage.removeItem(AN_STORE); }catch(e){}
     AN.ok = null; AN.q = []; AN.install = ""; AN.sit = "";
-    anInit();
+    anInit(); anGate();
   };
   r.parentNode.insertBefore(b, r.nextSibling);
 })();
