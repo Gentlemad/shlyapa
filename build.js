@@ -25,8 +25,9 @@ function arg(name){
   return i >= 0 ? args[i + 1] : null;
 }
 const FROM = arg("--from");
+const ARTIFACT = args.indexOf("--artifact") >= 0;
 const SRC = path.join(__dirname, "src", "shlyapa.html");
-const OUT = path.join(__dirname, arg("--out") || "index.html");
+const OUT = path.resolve(__dirname, arg("--out") || "index.html");
 
 const TITLE = "Шляпа";
 const DESC = "Объясняйте и угадывайте собственные слова в различных форматах";
@@ -81,6 +82,20 @@ function build(){
   body = body.replace('var BUILD = "dev";', 'var BUILD = ' + JSON.stringify(stamp) + ';');
   if(body.length === beforeStamp){
     console.warn("Предупреждение: отметка сборки не подставлена, проверьте объявление BUILD");
+  }
+
+  // Артефакт оборачивает страницу в doctype/head/body сам, поэтому отдаём
+  // голый фрагмент - ровно в том виде, в каком исходник и писался. Режим
+  // приложения включаем принудительно: в артефакте нет ?app в адресе.
+  if(ARTIFACT){
+    const frag = (head + "\n" + body.trim())
+      .replace('if(q.indexOf("app") >= 0) document.body.classList.add("appmode");',
+               'document.body.classList.add("appmode");');
+    fs.writeFileSync(OUT, frag, "utf8");
+    console.log("Готово: " + path.basename(OUT) + ", " +
+      (Buffer.byteLength(frag, "utf8") / 1024).toFixed(1) + " КБ (для артефакта" +
+      (FROM ? ", исходник из ветки " + FROM : "") + ")");
+    return;
   }
 
   const out =
