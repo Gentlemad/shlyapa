@@ -1646,9 +1646,11 @@ function renderSetup(){
   bindSeg("seg-words", function(v){ S.settings.wordsPerPlayer=+v; go(); });
   bindSeg("seg-time",  function(v){ S.settings.turnSeconds=+v; go(); });
   byId("go-entry").onclick=function(){
+    /* Имена не уходят. Игроки различаются номером в очереди - для всех
+       гипотез и для портрета пары этого достаточно, а баннер и политика
+       становятся безобидными по существу, а не на словах. */
     track("game_configured", {
       players: S.players.length,
-      names: S.players.map(function(p){ return p.name; }),
       wordsPerPlayer: S.settings.wordsPerPlayer,
       turnSeconds: S.settings.turnSeconds,
       minutes: estimateMinutes()
@@ -2911,7 +2913,6 @@ function finish(){
     /* Разрыв между первым и последним: подозреваемый номер один в том,
        почему компания не садится за следующую партию */
     spread: sc.length ? (sc[0].pts - sc[sc.length-1].pts) : 0,
-    names: S.players.map(function(p){ return p.name; }),
     hat: S.words.map(function(w){ return w.text; })
   });
   anGoal("game_finished");
