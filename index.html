@@ -674,7 +674,7 @@ var STORE = "shlyapa.mvp.v9";
    ============================================================ */
 var FEEDBACK_URL = "https://shlyapa-feedback.grudanovartyom.workers.dev";
 var TELEGRAM_URL = "https://t.me/gentlemad";
-var BUILD = "2026-09-19 14:43 UTC";                 /* сюда build.js подставляет отметку сборки */
+var BUILD = "2026-09-19 15:23 UTC";                 /* сюда build.js подставляет отметку сборки */
 var FB_STORE = "shlyapa.fb.v1";
 var FB_MIN = 5, FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
 /* Счётчик символов висит на экране без дела: показываем, только когда
@@ -783,12 +783,36 @@ function sameCycle(a, b){
   for(var k=0;k<n;k++) if(a[k]!==b[(at+k)%n]) return false;
   return true;
 }
-function reshuffleOrder(prev){
-  for(var tries=0; tries<60; tries++){
-    var next=shuffle(prev);
-    if(!sameCycle(prev,next)) return next;
+/* Сколько раз пара уже играла. Считаем по журналу, отдельного счётчика не
+   заводим: так подсчёт сам переживает восстановление прерванной партии. */
+function pairCounts(){
+  var c={};
+  S.log.forEach(function(t){ var k=t.ex+">"+t.gu; c[k]=(c[k]||0)+1; });
+  return c;
+}
+/* Круг на следующий заход.
+
+   Первым остаётся тот, кто угадывал последним: пары берутся из круга подряд,
+   поэтому последняя пара круга - это (order[n-1] -> order[0]). Если новый
+   круг начать с кого-то другого, телефон перепрыгнет через людей, и цепочка
+   "угадывал - теперь объясняю" порвётся на стыке кругов.
+
+   Из случайных вариантов берём тот, где меньше всего уже игранных пар: никто
+   не играет с одним и тем же дважды, пока есть неигранные. Жёсткого запрета
+   нет намеренно - на четырёх игроках три круга без повторов невозможны в
+   принципе (полный ориентированный граф на четырёх вершинах не раскладывается
+   на гамильтоновы циклы), и жёсткая проверка упиралась бы в тупик. */
+function nextOrder(prev){
+  var head=prev[0], tail=prev.slice(1), count=pairCounts();
+  var best=null, bestScore=Infinity;
+  for(var t=0;t<150;t++){
+    var cand=[head].concat(shuffle(tail));
+    if(sameCycle(prev,cand)) continue;
+    var score=0;
+    for(var i=0;i<cand.length;i++) score += count[cand[i]+">"+cand[(i+1)%cand.length]] || 0;
+    if(score<bestScore){ bestScore=score; best=cand; if(score===0) break; }
   }
-  return prev;   // до сюда не доходит: непроворотных перестановок всегда больше
+  return best||prev;
 }
 function esc(s){
   return String(s).replace(/[&<>"']/g,function(c){
@@ -2348,7 +2372,7 @@ function advanceState(){
   S.idx++;
   if(S.idx>=n){
     S.idx=0; S.lap++;
-    if(S.round!==3) S.order=reshuffleOrder(S.order);
+    if(S.round!==3) S.order=nextOrder(S.order);
   }
   return false;
 }
