@@ -173,6 +173,22 @@
     background:rgba(20,24,32,.05);border:1px solid transparent;border-radius:11px}
   .tf:focus{outline:none;border-color:var(--accent);background:var(--raise)}
   .tf:disabled{opacity:.5}
+  /* многострочное поле отзыва: класс tf оставлен, чтобы в корпусе прототипа
+     его подхватывала фейковая клавиатура, а .ta перебивает фиксированную высоту */
+  .ta{height:auto;min-height:104px;padding:10px 13px;line-height:1.45;resize:none;display:block}
+  /* .tf растягивается через flex внутри .tfrow; в одиночку ширину задаём сами */
+  .tfwide{width:100%;display:block}
+  .fbhint{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--faint)}
+  .fbstatus{font-size:13px;min-height:18px}
+  .fbstatus.bad{color:var(--danger)}
+  .fbstatus.ok{color:var(--ok)}
+  /* внешняя ссылка остаётся ссылкой: её можно скопировать и открыть в телеграме */
+  .linkbtn{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;
+    border:1px solid var(--accent);border-radius:11px;color:var(--accent);background:transparent;
+    font-size:15px;font-weight:600;text-decoration:none;padding:0 14px}
+  .linkbtn svg{width:17px;height:17px}
+  .fblink{background:none;border:0;padding:0;color:var(--accent);font-size:14px;
+    font-weight:600;cursor:pointer;text-align:center}
   .addbtn{flex:none;height:42px;padding:0 16px;border:1px solid var(--accent);background:transparent;
     color:var(--accent);border-radius:11px;font-size:14px;font-weight:600;cursor:pointer}
   .addbtn:hover:not(:disabled){background:var(--accent-soft)}
@@ -497,6 +513,7 @@
         <div class="overlay" id="o-flash" hidden><div class="flash" id="flash-inner"></div></div>
         <div class="overlay" id="o-sheet" hidden><div id="sheet-inner" style="flex:1;min-height:0;display:flex;flex-direction:column"></div></div>
         <div class="overlay" id="o-roster" hidden><div id="roster-inner" style="flex:1;min-height:0;display:flex;flex-direction:column"></div></div>
+        <div class="overlay" id="o-fb" hidden><div id="fb-inner" style="flex:1;min-height:0;display:flex;flex-direction:column"></div></div>
         <div class="kb" id="kb"></div>
         <div class="scrollthumb" id="scrollthumb"></div>
       </div>
@@ -524,6 +541,18 @@ var SEED_WORDS = ["чайник","парус","совесть","лестница
 
 var MIN_PLAYERS = 3;
 var STORE = "shlyapa.mvp.v9";
+
+/* ============================================================
+   ОБРАТНАЯ СВЯЗЬ
+   Пустой FEEDBACK_URL прячет форму и оставляет только ссылку в телеграм,
+   пустой TELEGRAM_URL убирает и её, а пустые оба убирают сам вход. Так
+   страница остаётся рабочей, пока эндпоинт не поднят.
+   ============================================================ */
+var FEEDBACK_URL = "";
+var TELEGRAM_URL = "";
+var BUILD = "dev";                 /* сюда build.js подставляет отметку сборки */
+var FB_STORE = "shlyapa.fb.v1";
+var FB_MIN = 5, FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
 var S = null, timerRaf = null, lastTick = 0, audio = null, swiping = false, wakeLock = null;
 
 function sv(d,w){
@@ -564,7 +593,9 @@ var IC = {
   play:  sv('<path d="M7 4.5l12 7.5-12 7.5z"/>'),
   star:  sv('<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"/>'),
   smile: sv('<circle cx="12" cy="12" r="9"/><path d="M8.5 14.2c.9 1.2 2.1 1.8 3.5 1.8s2.6-.6 3.5-1.8"/><path d="M9 9.5h.01M15 9.5h.01"/>'),
-  rake:  sv('<path d="M12 21V11"/><path d="M5 11h14"/><path d="M5 11V7M9.7 11V7M14.3 11V7M19 11V7"/>')
+  rake:  sv('<path d="M12 21V11"/><path d="M5 11h14"/><path d="M5 11V7M9.7 11V7M14.3 11V7M19 11V7"/>'),
+  send:  sv('<path d="M21 3L10.5 13.5"/><path d="M21 3l-6.8 18-3.7-7.5L3 9.8z"/>'),
+  chat:  sv('<path d="M20 13.5a3 3 0 0 1-3 3H9l-4.5 3.5v-3.5a3 3 0 0 1-1-2.2V7a3 3 0 0 1 3-3h10.5a3 3 0 0 1 3 3z"/>')
 };
 
 /* головные уборы для главного экрана */
@@ -1141,6 +1172,7 @@ function renderHome(){
           '<span style="display:inline-flex;align-items:center;gap:7px">'+
           '<span style="width:17px;height:17px;display:block">'+IC.help+'</span>Как играть</span></ion-button>'+
       '</div>'+
+      (fbAvailable() ? '<button class="fblink" id="h-fb">Написать автору</button>' : '')+
     '</div>';
 
   mountHats();
@@ -1149,6 +1181,7 @@ function renderHome(){
   var b;
   if((b=byId("h-stats"))) b.onclick=function(){ S.phase="stats"; S.statOpen=null; go(); };
   if((b=byId("h-again"))) b.onclick=function(){ replayFrom(last); };
+  if((b=byId("h-fb"))) b.onclick=openFeedback;
 }
 function renderRules(){
   byId("s-rules").innerHTML =
@@ -1395,6 +1428,174 @@ function renderRoster(){
   var rb=byId("r-begin");
   if(rb) rb.onclick=function(){ closeRoster(); beginGame(); };
   requestAnimationFrame(syncSticky);
+}
+
+/* ============================================================
+   ОБРАТНАЯ СВЯЗЬ
+   ============================================================ */
+function fbGet(k){ try{ return localStorage.getItem(FB_STORE+"."+k); }catch(e){ return null; } }
+function fbSet(k,v){ try{ localStorage.setItem(FB_STORE+"."+k, v); }catch(e){} }
+function fbDel(k){ try{ localStorage.removeItem(FB_STORE+"."+k); }catch(e){} }
+
+function fbFormOn(){ return !!FEEDBACK_URL; }
+function fbTgOn(){ return !!TELEGRAM_URL; }
+function fbAvailable(){ return fbFormOn() || fbTgOn(); }
+
+/* Что уходит вместе с отзывом. Содержимое партии сюда не попадает:
+   имена игроков и загаданные слова - чужие данные, а в шляпе пишут всякое.
+   Счётчики и настройки этого не раскрывают, но дают воспроизвести баг. */
+function fbContext(){
+  var vp = window.visualViewport;
+  var w = Math.round(vp ? vp.width : window.innerWidth);
+  var h = Math.round(vp ? vp.height : window.innerHeight);
+  var c = {
+    build: BUILD,
+    at: new Date().toISOString(),
+    screen: fbWhere(),
+    viewport: w + "x" + h,
+    dpr: window.devicePixelRatio || 1,
+    lang: navigator.language || "",
+    reducedMotion: reduced(),
+    ua: navigator.userAgent || ""
+  };
+  try{ c.standalone = !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches); }catch(e){}
+  if(S){
+    c.round = S.round;
+    c.players = S.players.length;
+    c.words = S.words.length;
+    c.hatLeft = S.hat.length;
+    c.turnNo = S.turnNo;
+    c.settings = {wordsPerPlayer:S.settings.wordsPerPlayer, turnSeconds:S.settings.turnSeconds};
+  }
+  return c;
+}
+/* Экран, с которого написали: если поверх лежала шторка или ростер, важна она,
+   а не фаза под ней. */
+function fbWhere(){
+  var o = byId("o-sheet"), r = byId("o-roster"), f = byId("o-flash");
+  if(o && !o.hidden) return "пауза";
+  if(r && !r.hidden) return "список игроков";
+  if(f && !f.hidden) return "граница раунда";
+  return (S && S.phase) || "?";
+}
+
+function openFeedback(){
+  if(!fbAvailable()) return;
+  kbHide();
+  renderFeedback();
+  byId("o-fb").hidden = false;
+  var t = byId("fb-text");
+  if(t) setTimeout(function(){ try{ t.focus(); }catch(e){} }, 80);
+}
+function closeFeedback(){ kbHide(); byId("o-fb").hidden = true; }
+
+function fbStatus(text, cls){
+  var el = byId("fb-status");
+  if(!el) return;
+  el.className = "fbstatus" + (cls ? " " + cls : "");
+  el.textContent = text || "";
+}
+function fbCount(){
+  var t = byId("fb-text"), c = byId("fb-count");
+  if(t && c) c.textContent = t.value.length + " / " + FB_MAX;
+}
+
+function renderFeedback(){
+  var inner = byId("fb-inner"), draft = fbGet("draft") || "", contact = fbGet("contact") || "";
+  var tg = fbTgOn()
+    ? '<a class="linkbtn" id="fb-tg" href="' + esc(TELEGRAM_URL) + '" target="_blank" rel="noopener noreferrer">' +
+        IC.chat + 'Написать в телеграм</a>'
+    : "";
+
+  var form = fbFormOn()
+    ? '<div><textarea class="tf ta tfwide" id="fb-text" maxlength="' + FB_MAX + '" ' +
+        'placeholder="Что сломалось, что мешало, чего не хватило"></textarea>' +
+        '<div class="fbhint"><span>Чем конкретнее, тем полезнее</span><span id="fb-count"></span></div></div>' +
+      '<div><div class="fieldlabel">Как с вами связаться, если понадобится</div>' +
+        '<input class="tf tfwide" type="text" id="fb-contact" maxlength="120" autocomplete="off" ' +
+        'placeholder="Необязательно: телеграм или почта" value="' + esc(contact) + '"></div>' +
+      /* ловушка для ботов: людям она не видна и всегда пуста */
+      '<input id="fb-hp" tabindex="-1" autocomplete="off" aria-hidden="true" ' +
+        'style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">' +
+      '<div class="note">К отзыву приложим отметку сборки, экран, с которого вы пишете, ' +
+        'размер экрана, браузер и устройство, число игроков и настройки партии. ' +
+        'Имена игроков и загаданные слова не отправляются.</div>'
+    : '<div class="stub">Форма отзыва ещё не подключена. Напишите напрямую в телеграм.</div>';
+
+  inner.innerHTML =
+    '<div class="hdr"><div class="hside">' + hbtn("fb-close", IC.back, "Назад") + '</div>' +
+    '<div class="htitle">Обратная связь</div><div class="hside right"></div></div>' +
+    '<div class="sheetbody"><div class="pad" style="gap:12px">' +
+      '<p>Это ранняя версия игры. Расскажите, что пошло не так, и её починят.</p>' +
+      form +
+    '</div></div>' +
+    '<div class="pad" style="flex:none;gap:10px">' +
+      '<div class="fbstatus" id="fb-status"></div>' +
+      (fbFormOn() ? '<ion-button id="fb-send" expand="block">' +
+        '<span style="display:inline-flex;align-items:center;gap:8px">' +
+        '<span style="width:16px;height:16px;display:block">' + IC.send + '</span>Отправить</span></ion-button>' : "") +
+      tg +
+    '</div>';
+
+  byId("fb-close").onclick = closeFeedback;
+  var t = byId("fb-text");
+  if(t){
+    t.value = draft;
+    fbCount();
+    t.oninput = function(){ fbCount(); fbSet("draft", t.value); fbStatus(""); };
+  }
+  var c = byId("fb-contact");
+  if(c) c.oninput = function(){ fbSet("contact", c.value); };
+  var b = byId("fb-send");
+  if(b) b.onclick = sendFeedback;
+  requestAnimationFrame(syncSticky);
+}
+
+function sendFeedback(){
+  var t = byId("fb-text"), c = byId("fb-contact"), hp = byId("fb-hp"), b = byId("fb-send");
+  if(!t) return;
+  if(hp && hp.value){ fbSent(); return; }        // бот заполнил ловушку: молча прощаемся
+  var text = t.value.trim();
+  if(text.length < FB_MIN){ fbStatus("Напишите хотя бы пару слов", "bad"); try{ t.focus(); }catch(e){} return; }
+
+  var last = +(fbGet("last") || 0);
+  var wait = Math.ceil((FB_COOLDOWN_MS - (Date.now() - last)) / 1000);
+  if(wait > 0){ fbStatus("Отзыв только что ушёл, подождите " + num(wait,"секунду","секунды","секунд"), "bad"); return; }
+
+  kbHide();
+  b.disabled = true;
+  fbStatus("Отправляем...");
+
+  var ctrl = null, timer = null;
+  try{ ctrl = new AbortController(); }catch(e){}
+  if(ctrl) timer = setTimeout(function(){ try{ ctrl.abort(); }catch(e){} }, FB_TIMEOUT_MS);
+
+  fetch(FEEDBACK_URL, {
+    method: "POST", mode: "cors", headers: {"content-type": "application/json"},
+    body: JSON.stringify({text: text, contact: (c ? c.value.trim().slice(0,120) : ""), ctx: fbContext()}),
+    signal: ctrl ? ctrl.signal : undefined
+  }).then(function(r){
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    if(timer) clearTimeout(timer);
+    fbSent();
+  }).catch(function(){
+    if(timer) clearTimeout(timer);
+    b.disabled = false;
+    /* Текст не стираем и черновик не трогаем: отправить не вышло,
+       человек должен иметь возможность скопировать написанное в телеграм. */
+    fbStatus(fbTgOn() ? "Не отправилось. Попробуйте ещё раз или напишите в телеграм"
+                      : "Не отправилось. Попробуйте ещё раз позже", "bad");
+  });
+}
+function fbSent(){
+  fbSet("last", String(Date.now()));
+  fbDel("draft");
+  var t = byId("fb-text");
+  if(t){ t.value = ""; fbCount(); }
+  var b = byId("fb-send");
+  if(b) b.disabled = false;
+  fbStatus("Спасибо, отзыв ушёл", "ok");
+  buzz(12);
 }
 
 /* ============================================================
@@ -1916,6 +2117,7 @@ function renderSheet(){
     '<div class="pad" style="flex:none;gap:10px">'+ resumeLine()+
       '<ion-button id="resume" expand="block">Вернуться в игру</ion-button>'+
       '<ion-button id="abandon" expand="block" fill="outline" color="medium">Завершить партию досрочно</ion-button>'+
+      (fbAvailable() ? '<button class="fblink" id="sh-fb">Сообщить о проблеме</button>' : '')+
     '</div>';
 
   bindSeg("sh-tabs", function(v){
@@ -1925,6 +2127,8 @@ function renderSheet(){
   byId("sh-close").onclick=closeSheet;
   byId("resume").onclick=closeSheet;
   byId("abandon").onclick=function(){ byId("o-sheet").hidden=true; finish(); };
+  var fb=byId("sh-fb");
+  if(fb) fb.onclick=openFeedback;
   bindJournal(inner);
   requestAnimationFrame(syncSticky);
 }
@@ -2045,7 +2249,9 @@ function renderResults(){
       '<div class="actions"><ion-button id="again" expand="block">'+
         '<span style="display:inline-flex;align-items:center;gap:8px">'+
         '<span style="width:17px;height:17px;display:block">'+IC.repeat+'</span>Сыграть тем же составом</span>'+
-      '</ion-button></div>'+
+      '</ion-button>'+
+      (fbAvailable() ? '<button class="fblink" id="res-fb">Рассказать, как вам игра</button>' : '')+
+      '</div>'+
     '</div>';
 
   bindSeg("res-tabs", function(v){
@@ -2053,6 +2259,8 @@ function renderResults(){
     if(t!==S.rtab){ S.rtab=t; renderResults(); }
   });
   bindJournal(el);
+  var fb=byId("res-fb");
+  if(fb) fb.onclick=openFeedback;
   byId("again").onclick=function(){
     var names=S.players.map(function(p){ return p.name; }), st2=S.settings, dv=S.devState;
     S=freshState(names,st2);

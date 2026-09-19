@@ -50,6 +50,14 @@ function build(){
     console.warn("Предупреждение: блок клавиатуры не найден, проверьте разметку");
   }
 
+  // Отметка сборки едет в отзывы: по ней видно, на какой версии словили баг
+  const stamp = new Date().toISOString().slice(0,16).replace("T", " ") + " UTC";
+  const beforeStamp = body.length;
+  body = body.replace('var BUILD = "dev";', 'var BUILD = ' + JSON.stringify(stamp) + ';');
+  if(body.length === beforeStamp){
+    console.warn("Предупреждение: отметка сборки не подставлена, проверьте объявление BUILD");
+  }
+
   const out =
 `<!doctype html>
 <html lang="ru">
