@@ -187,9 +187,112 @@
      его подхватывала фейковая клавиатура, а .ta перебивает фиксированную высоту */
   .ta{height:auto;min-height:104px;padding:10px 13px;line-height:1.45;resize:none;display:block}
   /* .tf растягивается через flex внутри .tfrow; в одиночку ширину задаём сами */
-  .tfwide{width:100%;display:block}
+  /* .tf несёт flex:1 ради строки .tfrow. В колоночном контейнере то же
+     правило начинает управлять высотой и схлопывает поле, поэтому гасим */
+  .tfwide{width:100%;display:block;flex:none}
   .fbhint{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--faint)}
   /* оценка: пять лиц, невыбранные приглушены, чтобы выбранное читалось сразу */
+  /* уголок над геро: кнопка не должна спорить с логотипом за внимание */
+  .topright{display:flex;justify-content:flex-end;margin-bottom:-6px}
+  .ghostbtn{width:40px;height:40px;display:grid;place-items:center;border:0;
+    background:none;color:var(--muted);cursor:pointer;border-radius:12px;padding:0}
+  .ghostbtn svg{width:21px;height:21px}
+  .ghostbtn:active{background:rgba(20,24,32,.06)}
+  .toast{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);z-index:40;
+    background:var(--bench-ink);color:#fff;border-radius:999px;padding:9px 16px;
+    font-size:13.5px;font-weight:600;white-space:nowrap;pointer-events:none;
+    box-shadow:0 8px 22px rgba(20,24,32,.28);animation:toastIn .22s ease}
+  @keyframes toastIn{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+  /* ================= инструкция ================= */
+  .acc{border-bottom:1px solid var(--line)}
+  .acchead{display:flex;align-items:center;gap:11px;width:100%;text-align:left;
+    border:0;background:none;padding:14px 2px;cursor:pointer;color:var(--ink)}
+  .acchead .anum{flex:none;width:26px;height:26px;border-radius:9px;display:grid;
+    place-items:center;font-size:12.5px;font-weight:700;
+    background:var(--accent-soft);color:var(--accent)}
+  .acchead .atitle{flex:1;min-width:0;font-size:15px;font-weight:600;letter-spacing:-.01em}
+  .acchead .achev{flex:none;width:17px;height:17px;color:var(--faint);
+    transition:transform .2s ease}
+  .acc[data-open="1"] .achev{transform:rotate(90deg)}
+  .acc[data-open="1"] .anum{background:var(--accent);color:#fff}
+  .accbody{padding:0 2px 16px 39px;display:flex;flex-direction:column;gap:11px}
+  .accbody p{font-size:13.5px}
+  .faq .acchead{padding:13px 2px}
+  .faq .acchead .atitle{font-weight:600;font-size:14.5px}
+  .faq .accbody{padding:0 2px 15px 2px}
+
+  /* Живой фрейм: показывает этап вместо того, чтобы описывать его словами */
+  .demo{position:relative;height:136px;border-radius:14px;overflow:hidden;
+    background:var(--raise);border:1px solid var(--line)}
+  .demo .cap{position:absolute;left:11px;top:9px;font-size:10.5px;letter-spacing:.09em;
+    text-transform:uppercase;color:var(--faint);font-weight:600}
+
+  /* телефон переходит по кругу */
+  .dpass{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:26px;
+    padding-bottom:34px}
+  .dperson{width:34px;height:34px;border-radius:50%;background:var(--accent-soft);
+    color:var(--accent);display:grid;place-items:center;font-size:13px;font-weight:700}
+  /* телефон идёт под кружками, иначе закрывает букву того, у кого он сейчас */
+  .dphone{position:absolute;top:50%;left:50%;width:19px;height:30px;border-radius:5px;
+    background:var(--bench-ink);margin-top:20px;margin-left:-9.5px;
+    animation:dpass 4.2s cubic-bezier(.6,0,.4,1) infinite}
+  @keyframes dpass{
+    0%,14%{transform:translateX(-60px)} 30%,44%{transform:translateX(0)}
+    60%,74%{transform:translateX(60px)} 90%,100%{transform:translateX(-60px)}}
+
+  /* слова падают в шляпу */
+  .dhat{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);
+    width:52px;height:52px;color:var(--accent)}
+  .dword{position:absolute;left:50%;top:26px;transform:translateX(-50%);
+    background:var(--surface);border:1px solid var(--line-strong);border-radius:999px;
+    padding:4px 12px;font-size:12.5px;font-weight:600;white-space:nowrap;
+    animation:dfall 3.6s ease-in infinite;opacity:0}
+  .dword.w2{animation-delay:1.2s} .dword.w3{animation-delay:2.4s}
+  @keyframes dfall{
+    0%{opacity:0;transform:translate(-50%,-14px) scale(.9)}
+    18%{opacity:1;transform:translate(-50%,0) scale(1)}
+    55%{opacity:1;transform:translate(-50%,0) scale(1)}
+    85%,100%{opacity:0;transform:translate(-50%,44px) scale(.72)}}
+
+  /* карточка уходит вверх, следом встаёт новая */
+  .dcard{position:absolute;left:50%;top:50%;width:132px;height:64px;margin:-32px 0 0 -66px;
+    background:var(--surface);border:1px solid var(--line);border-radius:12px;
+    display:grid;place-items:center;font-size:14px;font-weight:700;
+    box-shadow:0 2px 8px rgba(20,24,32,.08);animation:dswipe 3.4s ease-in-out infinite}
+  .dcard.back{animation:dback 3.4s ease-in-out infinite;z-index:0;color:var(--muted)}
+  @keyframes dswipe{
+    0%,26%{transform:translateY(0);opacity:1}
+    46%,100%{transform:translateY(-96px);opacity:0}}
+  @keyframes dback{
+    0%,30%{transform:translateY(9px) scale(.96);opacity:.5}
+    52%,100%{transform:translateY(0) scale(1);opacity:1}}
+  .dplus{position:absolute;left:50%;top:32px;margin-left:-12px;color:var(--ok);
+    font-size:17px;font-weight:800;opacity:0;animation:dplus 3.4s ease-out infinite}
+  @keyframes dplus{0%,30%{opacity:0;transform:translateY(6px)}
+    44%{opacity:1;transform:translateY(-6px)} 70%,100%{opacity:0;transform:translateY(-20px)}}
+  .dswipehint{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);
+    font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:600}
+
+  /* форматы сменяют друг друга */
+  .dmodes{position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:7px}
+  .dmode{border:1px solid var(--line);border-radius:999px;padding:5px 14px;
+    font-size:12.5px;font-weight:600;color:var(--muted);background:var(--surface);
+    animation:dmode 5.4s ease-in-out infinite}
+  .dmode.m2{animation-delay:1.8s} .dmode.m3{animation-delay:3.6s}
+  @keyframes dmode{
+    0%,30%{background:var(--accent);border-color:var(--accent);color:#fff}
+    34%,100%{background:var(--surface);border-color:var(--line);color:var(--muted)}}
+
+  /* очко достаётся обоим сразу */
+  .dboth{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:16px}
+  .dpair{display:flex;flex-direction:column;align-items:center;gap:7px}
+  .dpair .dperson{width:38px;height:38px}
+  .dpair .role{font-size:10.5px;color:var(--faint);letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+  .dscore{font-size:13px;font-weight:800;color:var(--ok);opacity:0;animation:dboth 3s ease-out infinite}
+  @keyframes dboth{0%,28%{opacity:0;transform:translateY(5px)}
+    46%,74%{opacity:1;transform:translateY(0)} 100%{opacity:0;transform:translateY(-6px)}}
+
   .rate{display:flex;gap:6px}
   .rateb{flex:1;min-width:0;height:52px;border:1px solid var(--line);border-radius:12px;
     background:var(--raise);font-size:25px;line-height:1;cursor:pointer;padding:0;
@@ -201,8 +304,11 @@
   .chipb{border:1px solid var(--line);background:var(--raise);color:var(--muted);
     border-radius:999px;padding:8px 13px;font-size:13.5px;font-weight:500;cursor:pointer}
   .chipb[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
-  .check{display:flex;align-items:center;gap:10px;width:100%;text-align:left;
-    border:0;background:none;padding:2px 0;cursor:pointer;font-size:14px;color:var(--ink)}
+  /* выравниваем по первой строке подписи: при переносе галочка не должна
+     уезжать в середину блока */
+  .check{display:flex;align-items:flex-start;gap:10px;width:100%;text-align:left;
+    border:0;background:none;padding:0;cursor:pointer;font-size:14px;line-height:22px;
+    color:var(--ink);min-height:22px}
   .check .box{flex:none;width:22px;height:22px;border:1px solid var(--line-strong);
     border-radius:7px;display:grid;place-items:center;color:transparent}
   .check .box svg{width:14px;height:14px}
@@ -495,7 +601,12 @@
   @media (prefers-reduced-motion:reduce){
     .card,.kb,.hatstack .hi{transition:none}
     .plusone,.streak,.winner .cup,.fmt b.pop,.hero,.lastgame,.homebtns,
-    .dotlayer,.screen.enter,.overlay,.mood,.radarpoly{animation:none}
+    .dotlayer,.screen.enter,.overlay,.mood,.radarpoly,
+    .dphone,.dword,.dcard,.dplus,.dmode,.dscore,.toast{animation:none}
+    /* без анимации фреймы показывают конечное состояние, а не пустоту */
+    .dword,.dplus,.dscore{opacity:1}
+    .dcard.back{opacity:1;transform:none}
+    .dmode.m1{background:var(--accent);border-color:var(--accent);color:#fff}
   }
 </style>
 </head>
@@ -572,7 +683,7 @@ var STORE = "shlyapa.mvp.v9";
    ============================================================ */
 var FEEDBACK_URL = "https://shlyapa-feedback.grudanovartyom.workers.dev";
 var TELEGRAM_URL = "https://t.me/gentlemad";
-var BUILD = "2026-09-19 09:25 UTC";                 /* сюда build.js подставляет отметку сборки */
+var BUILD = "2026-09-19 09:47 UTC";                 /* сюда build.js подставляет отметку сборки */
 var FB_STORE = "shlyapa.fb.v1";
 var FB_MIN = 5, FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
 /* Счётчик символов висит на экране без дела: показываем, только когда
@@ -585,7 +696,7 @@ var FB_FACES = [
   {face:"\uD83D\uDE42", label:"Понравилось"},
   {face:"\uD83E\uDD29", label:"Отлично"}
 ];
-var FB_KINDS = ["Поломка", "Неудобство", "Идея", "Впечатление"];
+var FB_KINDS = ["Поломка", "Неудобство", "Предложение", "Впечатление"];
 var fbRate = 0, fbKind = "", fbReach = false;
 var S = null, timerRaf = null, lastTick = 0, audio = null, swiping = false, wakeLock = null;
 
@@ -633,6 +744,8 @@ var IC = {
   tg:    '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">'+
          '<path d="M21.94 4.58 18.9 19.2c-.23 1.02-.84 1.27-1.7.79l-4.7-3.47-2.27 2.19c-.25.25-.46.46-.95.46l.34-4.8 8.73-7.9c.38-.34-.08-.53-.59-.19L6.97 12.9l-4.65-1.45c-1.01-.32-1.03-1.01.21-1.5l18.17-7.02c.84-.31 1.58.2 1.24 1.65z"/></svg>',
   /* Мегафон: обводка, как у остальных значков интерфейса */
+  share: sv('<path d="M12 15V4"/><path d="M8 7.5 12 3.5l4 4"/>'+
+            '<path d="M5 13v5.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V13"/>'),
   horn:  sv('<path d="M4 9.5v5a1.5 1.5 0 0 0 1.5 1.5H8l9 4.5V5L8 9.5H5.5A1.5 1.5 0 0 0 4 11z"/>'+
             '<path d="M7.5 16v3.2a1.3 1.3 0 0 0 1.3 1.3h1.2"/>'+
             '<path d="M20 9.8a3.4 3.4 0 0 1 0 4.4"/>')
@@ -1057,6 +1170,10 @@ function devJump(target){
 function hbtn(id, ic, label){
   return '<button class="hbtn" id="'+id+'" aria-label="'+esc(label)+'" title="'+esc(label)+'">'+ic+'</button>';
 }
+/* То же, но без стилей панели: для кнопок, живущих внутри экрана */
+function hbtn2(id, ic, label){
+  return '<button class="ghostbtn" id="'+id+'" aria-label="'+esc(label)+'" title="'+esc(label)+'">'+ic+'</button>';
+}
 function renderBar(){
   var left="", right="", title="";
   if(S.phase==="home"){ byId("bar").innerHTML=""; return; }   // на главном панель не нужна
@@ -1192,6 +1309,7 @@ function renderHome(){
 
   el.innerHTML =
     '<div class="pad" style="gap:14px">'+
+      '<div class="topright">'+hbtn2("h-share", IC.share, "Поделиться игрой")+'</div>'+
       '<div class="hero">'+
         '<div class="hatstack" id="hatstack"></div>'+
         '<h1>Шляпа</h1>'+
@@ -1217,27 +1335,103 @@ function renderHome(){
     '</div>';
 
   mountHats();
+  byId("h-share").onclick=shareGame;
   byId("h-new").onclick=function(){ S.phase="setup"; go(); };
-  byId("h-rules").onclick=function(){ S.phase="rules"; go(); };
+  byId("h-rules").onclick=function(){
+    S.phase="rules";
+    if(S.rulesTab === undefined){ S.rulesTab = "how"; S.rulesOpen = 0; }
+    go();
+  };
   var b;
   if((b=byId("h-stats"))) b.onclick=function(){ S.phase="stats"; S.statOpen=null; go(); };
   if((b=byId("h-again"))) b.onclick=function(){ replayFrom(last); };
   if((b=byId("h-fb"))) b.onclick=openFeedback;
 }
+/* Шаги показываются живым фреймом: ворох текста никто не читает.
+   Каждый фрейм проигрывает этап, а не описывает его. */
+var STEPS = [
+  {t:"Соберите компанию",
+   p:"От трёх человек и один телефон на всех. Он пойдёт по кругу: каждый по очереди объясняет своему соседу.",
+   d:'<div class="cap">телефон идёт по кругу</div><div class="dpass">'+
+     '<div class="dperson">А</div><div class="dperson">Б</div><div class="dperson">В</div></div>'+
+     '<div class="dphone"></div>'},
+  {t:"Придумайте слова",
+   p:"Каждый вводит свои слова и передаёт телефон дальше. Все слова попадают в общую шляпу — готовых наборов здесь нет.",
+   d:'<div class="cap">слова уходят в шляпу</div>'+
+     '<div class="dword w1">маяк</div><div class="dword w2">сквозняк</div><div class="dword w3">совесть</div>'+
+     '<div class="dhat">'+IC.hat+'</div>'},
+  {t:"Объясняйте и засчитывайте",
+   p:"Один объясняет, сосед угадывает, остальные молчат. Угадали — свайп карточки вверх, и сразу следующее слово. Пропускать нельзя: неугаданное вернётся в шляпу.",
+   d:'<div class="cap">свайп вверх — угадано</div>'+
+     '<div class="dcard back">парус</div><div class="dcard">маяк</div>'+
+     '<div class="dplus">+1</div><div class="dswipehint">↑</div>'},
+  {t:"Три раунда на одних словах",
+   p:"Когда шляпа пустеет, слова возвращаются, а правила меняются. Сначала объясняем словами, потом жестами, в конце — ровно одним словом.",
+   d:'<div class="cap">формат меняется</div><div class="dmodes">'+
+     '<div class="dmode m1">словами</div><div class="dmode m2">жестами</div>'+
+     '<div class="dmode m3">одним словом</div></div>'},
+  {t:"Очко получают оба",
+   p:"И тот, кто объяснял, и тот, кто угадал. Команд нет: счёт личный, но зарабатывается в паре с соседом.",
+   d:'<div class="cap">за каждое угаданное слово</div><div class="dboth">'+
+     '<div class="dpair"><div class="dperson">А</div><div class="role">объяснял</div>'+
+     '<div class="dscore">+1</div></div>'+
+     '<div class="dpair"><div class="dperson">Б</div><div class="role">угадал</div>'+
+     '<div class="dscore">+1</div></div></div>'}
+];
+
+var FAQ = [
+  {t:"Сколько нужно людей и телефонов?",
+   p:"От трёх человек и ровно один телефон: его передают по кругу. Игра рассчитана на компанию за одним столом, а не на игру по сети."},
+  {t:"Можно пропустить слово, если оно не идёт?",
+   p:"Нет. Если до конца хода слово не угадали, оно вернётся в шляпу и достанется кому-то ещё."},
+  {t:"Что будет, когда шляпа опустеет посреди хода?",
+   p:"Таймер замрёт и покажет, что правила сменились. Та же пара доиграет остаток времени уже по правилам следующего раунда."},
+  {t:"Засчитали слово по ошибке — можно исправить?",
+   p:"Да. На экране итога хода нажмите на слово, и отметка снимется. Очки пересчитаются сами."},
+  {t:"Партия прервалась — она сохранится?",
+   p:"Да, если вернуться в том же браузере на том же телефоне. Партия хранится на устройстве, поэтому очистка данных сайта её сотрёт, а на другой телефон она не переедет."},
+  {t:"Сколько длится партия?",
+   p:"Зависит от числа игроков и настроек. При выборе состава приложение покажет оценку — обычно выходит от двадцати минут до часа."},
+  {t:"Какие слова лучше загадывать?",
+   p:"Существительные: их проще показать жестами и назвать одним словом в третьем раунде. Приложение подскажет, если слово похоже на глагол или прилагательное, но запрещать не станет."}
+];
+
 function renderRules(){
-  byId("s-rules").innerHTML =
-    '<div class="pad rules"><ol>'+
-      '<li>Каждый придумывает несколько слов. Все они складываются в общую шляпу.</li>'+
-      '<li>Ход: один объясняет, сосед угадывает, остальные молчат. По умолчанию минута.</li>'+
-      '<li>Угаданное слово даёт очко обоим: и тому, кто объяснял, и тому, кто угадал.</li>'+
-      '<li>Пропускать слова нельзя. Неугаданное возвращается в шляпу.</li>'+
-      '<li>Раунд 1: объясняем любыми словами, кроме однокоренных.</li>'+
-      '<li>Раунд 2: только жесты и звуки.</li>'+
-      '<li>Раунд 3: ровно одно слово.</li>'+
-      '<li>Все три раунда идут на одном и том же наборе слов.</li>'+
-      '<li>Когда шляпа пустеет посреди хода, таймер замирает, а та же пара доигрывает остаток уже по правилам следующего раунда.</li>'+
-      '<li>Партия заканчивается, когда в третьем раунде все загадывали поровну.</li>'+
-    '</ol></div>';
+  var el = byId("s-rules");
+  var isFaq = (S.rulesTab === "faq");
+  var list = isFaq ? FAQ : STEPS;
+
+  var rows = list.map(function(item, i){
+    var open = (S.rulesOpen === i);
+    return '<div class="acc" data-open="' + (open ? 1 : 0) + '">' +
+      '<button class="acchead" data-acc="' + i + '" aria-expanded="' + open + '">' +
+        (isFaq ? "" : '<span class="anum">' + (i + 1) + '</span>') +
+        '<span class="atitle">' + esc(item.t) + '</span>' +
+        '<span class="achev">' + IC.chev + '</span>' +
+      '</button>' +
+      (open ? '<div class="accbody"><p>' + esc(item.p) + '</p>' +
+        (item.d ? '<div class="demo">' + item.d + '</div>' : '') + '</div>' : '') +
+    '</div>';
+  }).join("");
+
+  el.innerHTML =
+    '<div class="tabwrap">' + segHTML("rules-tabs", ["Как играть", "Вопросы"],
+      isFaq ? "Вопросы" : "Как играть") + '</div>' +
+    '<div class="pad' + (isFaq ? " faq" : "") + '" style="gap:0">' + rows + '</div>';
+
+  bindSeg("rules-tabs", function(v){
+    var t = (v === "Вопросы") ? "faq" : "how";
+    if(t !== S.rulesTab){ S.rulesTab = t; S.rulesOpen = (t === "faq") ? null : 0; renderRules(); save(); }
+  });
+  el.querySelectorAll("[data-acc]").forEach(function(b){
+    b.onclick = function(){
+      var i = +b.dataset.acc;
+      S.rulesOpen = (S.rulesOpen === i) ? null : i;
+      renderRules(); save();
+      requestAnimationFrame(syncSticky);
+    };
+  });
+  requestAnimationFrame(syncSticky);
 }
 function renderStats(){
   var el=byId("s-stats"), hist=loadHist();
@@ -1520,6 +1714,38 @@ function fbWhere(){
   return (S && S.phase) || "?";
 }
 
+/* Короткое сообщение поверх экрана: используется там, где действие
+   завершилось, но показывать целый экран не за чем. */
+var toastTimer = null;
+function toast(text){
+  var area = byId("screenarea");
+  if(!area) return;
+  var old = byId("toast");
+  if(old) old.remove();
+  var el = document.createElement("div");
+  el.className = "toast"; el.id = "toast"; el.textContent = text;
+  area.appendChild(el);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ if(el.parentNode) el.remove(); }, 2200);
+}
+
+/* Системное окно отправки, а если его нет - копируем ссылку в буфер.
+   Адрес берём без хвоста: в нём может оказаться ?app или якорь. */
+function shareGame(){
+  var url = location.origin + location.pathname;
+  var data = {title:"Шляпа", text:"Игра в Шляпу: объясняем и угадываем свои слова", url:url};
+  try{
+    if(navigator.share && (!navigator.canShare || navigator.canShare(data))){
+      navigator.share(data).catch(function(){});
+      return;
+    }
+  }catch(e){}
+  try{
+    navigator.clipboard.writeText(url).then(function(){ toast("Ссылка скопирована"); },
+                                           function(){ toast("Не вышло скопировать"); });
+  }catch(e){ toast("Не вышло скопировать"); }
+}
+
 function openFeedback(){
   if(!fbAvailable()) return;
   kbHide();
@@ -1556,7 +1782,8 @@ function renderFeedback(){
         '" aria-label="' + esc(f.label) + '" title="' + esc(f.label) + '">' + f.face + '</button>';
     }).join("") + '</div></div>';
 
-  var chips = '<div><div class="fieldlabel">Это скорее</div><div class="chips" id="fb-kind">' +
+  var chips = '<div><div class="fieldlabel">На что больше всего похож ваш отзыв</div>' +
+    '<div class="chips" id="fb-kind">' +
     FB_KINDS.map(function(k){
       return '<button class="chipb" data-kind="' + esc(k) + '" aria-pressed="' + (fbKind === k) + '">' +
         esc(k) + '</button>';
@@ -1566,7 +1793,7 @@ function renderFeedback(){
     ? rate + chips +
       '<div><textarea class="tf ta tfwide" id="fb-text" maxlength="' + FB_MAX + '" ' +
         'placeholder="Расскажите своими словами"></textarea>' +
-        '<div class="fbhint"><span>Чем конкретнее, тем лучше</span><span id="fb-count"></span></div></div>' +
+        '<div class="fbhint"><span></span><span id="fb-count"></span></div></div>' +
       '<div style="display:flex;flex-direction:column;gap:8px">' +
         '<button class="check" id="fb-reach" aria-pressed="' + fbReach + '">' +
           '<span class="box">' + IC.check + '</span>Можно связаться со мной</button>' +
@@ -1584,9 +1811,7 @@ function renderFeedback(){
     '<div class="sheetbody"><div class="pad" style="gap:14px">' + form + '</div></div>' +
     '<div class="pad" style="flex:none;gap:10px">' +
       '<div class="fbstatus" id="fb-status"></div>' +
-      (fbFormOn() ? '<ion-button id="fb-send" expand="block">' +
-        '<span style="display:inline-flex;align-items:center;gap:8px">' +
-        '<span style="width:16px;height:16px;display:block">' + IC.send + '</span>Отправить</span></ion-button>' : "") +
+      (fbFormOn() ? '<ion-button id="fb-send" expand="block">Отправить</ion-button>' : "") +
       tg +
     '</div>';
 
