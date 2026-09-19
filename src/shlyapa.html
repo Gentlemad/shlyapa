@@ -78,8 +78,9 @@
   .homebar{flex:none;height:22px;display:grid;place-items:center}
   .homebar i{display:block;width:124px;height:5px;border-radius:999px;background:rgba(20,24,32,.24)}
   #app{position:relative;flex:1;min-height:0;min-width:0;display:flex;flex-direction:column;background:var(--surface)}
-  /* слой точек исключён: иначе id-селектор сбивал ему position на relative */
-  #app > *:not(.dotlayer){position:relative;z-index:1}
+  /* слой точек и баннер согласия исключены: иначе id-селектор сбивал бы им
+     position на relative, и оба перестали бы держаться за края экрана */
+  #app > *:not(.dotlayer):not(.consent){position:relative;z-index:1}
   /* мягкие пятна под партией */
   #app.playing{
     background-image:
@@ -294,9 +295,45 @@
     border-radius:7px;display:grid;place-items:center;color:transparent}
   .check .box svg{width:14px;height:14px}
   .check[aria-pressed=true] .box{background:var(--accent);border-color:var(--accent);color:#fff}
-  /* перечень в согласии: маркеры тем же серым, что и пояснения */
-  .clist{margin:0;padding-left:18px;color:var(--muted);font-size:13.5px;line-height:1.5}
-  .clist li{margin-bottom:3px}
+  /* ================= согласие =================
+     Полоса снизу, а не оверлей на весь экран: вопрос необязательный, и
+     закрывать им игру целиком было бы нечестной подачей. Игру видно за
+     баннером, и он читается как предложение, а не как требование. */
+  .consent{position:absolute;left:0;right:0;bottom:0;z-index:25;
+    padding:0 11px 11px;pointer-events:none}
+  /* Градиент гасит контент над карточкой и уводит взгляд вниз. Тянется выше
+     самой карточки, поэтому лежит в псевдоэлементе, а не в фоне. */
+  .consent:before{content:"";position:absolute;left:0;right:0;bottom:0;top:-64px;
+    pointer-events:none;
+    /* Плотная часть градиента живёт ниже края карточки, а выше он почти
+       прозрачен: иначе он приглушал бы нижнюю кнопку экрана, которая как
+       раз туда и встаёт. */
+    background:linear-gradient(180deg,
+      rgba(250,252,255,0) 0%, rgba(250,252,255,.18) 42%,
+      rgba(250,252,255,.72) 72%, var(--surface) 100%)}
+  .consent .cbox{position:relative;pointer-events:auto;
+    background:var(--raise);border:1px solid var(--line);border-radius:16px;
+    padding:13px 14px 11px;
+    box-shadow:0 1px 2px rgba(20,24,32,.05), 0 12px 28px rgba(20,24,32,.16);
+    animation:consentIn .38s cubic-bezier(.2,.85,.3,1) both}
+  .consent .ct{font-size:14.5px;font-weight:700;letter-spacing:-.01em;margin-bottom:3px}
+  .consent .cp{font-size:12.5px;line-height:1.42;color:var(--muted);margin:0 0 11px}
+  .consent .cp a{color:var(--accent);text-decoration:none;font-weight:600;white-space:nowrap}
+  .consent .cbtns{display:flex;gap:7px;align-items:center}
+  .consent .cyes{flex:1;min-width:0;height:40px;border:0;border-radius:11px;
+    background:var(--accent);color:#fff;font-family:var(--ui);
+    font-size:14.5px;font-weight:600;cursor:pointer}
+  .consent .cyes:active{background:#1b61ce}
+  .consent .cno{flex:none;height:40px;padding:0 13px;border:0;background:none;
+    color:var(--muted);font-family:var(--ui);font-size:14px;font-weight:600;cursor:pointer}
+  .consent .cno:active{background:rgba(20,24,32,.06);border-radius:11px}
+  /* Пока баннер висит, экран поджимается на его высоту: иначе он ложится
+     поверх нижних кнопок, а на главной это кнопка "Создать игру".
+     Высоту меряем в JS и кладём в --conh: текст переносится по-разному. */
+  .consenting .screen{padding-bottom:var(--conh,152px)}
+  .consenting .actions.stuck{bottom:var(--conh,152px)}
+  @keyframes consentIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){ .consent .cbox{animation:none} }
   /* переключатель отправки статистики под инструкцией */
   .anrow{display:flex;align-items:center;gap:10px;padding:13px 2px 2px;
     border-top:1px solid var(--line);margin-top:14px;font-size:13.5px;color:var(--muted)}
@@ -637,6 +674,7 @@
           <section class="screen" id="s-turn" hidden></section>
           <section class="screen" id="s-review" hidden></section>
           <section class="screen" id="s-results" hidden></section>
+          <div class="consent" id="o-consent" hidden><div id="consent-inner"></div></div>
           <section class="screen" id="s-stats" hidden></section>
           <section class="screen" id="s-rules" hidden></section>
         </div>
@@ -646,7 +684,6 @@
         <div class="overlay" id="o-sheet" hidden><div id="sheet-inner" style="flex:1;min-height:0;display:flex;flex-direction:column"></div></div>
         <div class="overlay" id="o-roster" hidden><div id="roster-inner" style="flex:1;min-height:0;display:flex;flex-direction:column"></div></div>
         <div class="overlay" id="o-fb" hidden><div id="fb-inner" style="flex:1;min-height:0;display:flex;flex-direction:column"></div></div>
-        <div class="overlay" id="o-consent" hidden><div id="consent-inner" style="flex:1;min-height:0;display:flex;flex-direction:column"></div></div>
         <div class="kb" id="kb"></div>
         <div class="scrollthumb" id="scrollthumb"></div>
       </div>
@@ -2140,32 +2177,41 @@ function anAsk(first, lost){
   AN._pending = {first: !!first, lost: lost || null};
   var inner = byId("consent-inner");
   if(!inner) return;
+  /* Коротко и без запугивания: состав назван одной строкой, всё остальное
+     живёт за ссылкой. Длинный текст в баннере всё равно не читают. */
   inner.innerHTML =
-    '<div class="pad" style="justify-content:center">'+
-      '<h1>Помогите доработать игру</h1>'+
-      '<p>Приложение может присылать разработчику, как прошла партия:</p>'+
-      '<ul class="clist">'+
-        '<li>сколько секунд ушло на слова и где ход запнулся;</li>'+
-        '<li>имена игроков и придуманные вами слова;</li>'+
-        '<li>модель телефона, размер экрана и версию сборки.</li>'+
-      '</ul>'+
-      '<p>Часть данных обрабатывает Яндекс Метрика. Отказ ничего не ломает: '+
-        'игра работает полностью, просто молча. Передумать можно на экране '+
-        '"Как играть".</p>'+
-      (PRIVACY_URL ? '<p><a href="'+PRIVACY_URL+'" target="_blank" rel="noopener" '+
-        'style="color:var(--accent)">Подробно: что уходит и как это удалить</a></p>' : '')+
-      '<div class="spacer"></div>'+
-      '<div class="actions">'+
-        '<ion-button id="cons-yes" expand="block">Хорошо, помогу</ion-button>'+
-        '<button class="fblink" id="cons-no">Не отправлять</button>'+
+    '<div class="cbox">'+
+      '<div class="ct">Помочь доработать игру?</div>'+
+      '<p class="cp">Приложение пришлёт разработчику, как прошла партия: тайминги, '+
+        'имена игроков и придуманные слова. Отказ ничего не ломает.'+
+        (PRIVACY_URL ? ' <a href="'+PRIVACY_URL+'" target="_blank" rel="noopener">Подробнее</a>' : '')+
+      '</p>'+
+      '<div class="cbtns">'+
+        '<button class="cyes" id="cons-yes">Хорошо</button>'+
+        '<button class="cno" id="cons-no">Не надо</button>'+
       '</div>'+
     '</div>';
   byId("cons-yes").onclick = function(){ anAnswer(true); };
   byId("cons-no").onclick = function(){ anAnswer(false); };
   byId("o-consent").hidden = false;
+  byId("app").classList.add("consenting");
+  anMeasure();
+  window.addEventListener("resize", anMeasure);
+}
+/* Высота баннера вместе с отступом: её занимает нижний край экрана */
+function anMeasure(){
+  var box = document.querySelector("#o-consent .cbox");
+  if(!box) return;
+  /* Запас поверх высоты карточки: нижняя кнопка экрана должна встать выше
+     плотной части градиента, а не в неё. */
+  document.documentElement.style.setProperty("--conh", Math.ceil(box.offsetHeight + 34) + "px");
+  requestAnimationFrame(syncSticky);
 }
 function anAnswer(ok){
   byId("o-consent").hidden = true;
+  byId("app").classList.remove("consenting");
+  window.removeEventListener("resize", anMeasure);
+  requestAnimationFrame(syncSticky);
   anPatch({ok: !!ok});
   AN.ok = !!ok;
   var p = AN._pending || {};
