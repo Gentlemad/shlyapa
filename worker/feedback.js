@@ -48,7 +48,12 @@ export default {
 
     const text = String(body.text || "").trim().slice(0, MAX_TEXT);
     const contact = String(body.contact || "").trim().slice(0, MAX_CONTACT);
-    if (text.length < 5) return json({ error: "too short" }, 400, cors);
+    const rate = Number(body.rate) >= 1 && Number(body.rate) <= 5 ? Number(body.rate) : 0;
+    const kind = String(body.kind || "").trim().slice(0, 40);
+
+    // Оценки или категории достаточно: человек не обязан писать текст
+    if (!text && !rate && !kind) return json({ error: "empty" }, 400, cors);
+    if (text && text.length < 5) return json({ error: "too short" }, 400, cors);
 
     if (!env.BOT_TOKEN || !env.CHAT_ID) return json({ error: "not configured" }, 500, cors);
 
@@ -58,9 +63,13 @@ export default {
        перечисляет пользователю, что именно уходит с отзывом, и этого там нет.
        Добавлять сюда поля, не названные в форме, нельзя. */
 
+    const FACES = ["", "\uD83D\uDE21", "\uD83D\uDE41", "\uD83D\uDE10", "\uD83D\uDE42", "\uD83E\uDD29"];
+    const head = [rate ? FACES[rate] + " " + rate + "/5" : "", kind ? esc(kind) : ""]
+      .filter(Boolean).join(" · ");
+
     const message =
-      "<b>Отзыв о Шляпе</b>\n\n" +
-      esc(text) + "\n\n" +
+      "<b>Отзыв о Шляпе</b>" + (head ? "\n" + head : "") + "\n\n" +
+      (text ? esc(text) + "\n\n" : "") +
       (contact ? "<b>Связь:</b> " + esc(contact) + "\n" : "") +
       "<b>Экран:</b> " + esc(ctx.screen) + "\n" +
       "<b>Сборка:</b> " + esc(ctx.build) + "\n" +

@@ -551,7 +551,7 @@ var STORE = "shlyapa.mvp.v9";
    ============================================================ */
 var FEEDBACK_URL = "https://shlyapa-feedback.grudanovartyom.workers.dev";
 var TELEGRAM_URL = "https://t.me/gentlemad";
-var BUILD = "2026-09-19 08:52 UTC";                 /* сюда build.js подставляет отметку сборки */
+var BUILD = "2026-09-19 08:51 UTC";                 /* сюда build.js подставляет отметку сборки */
 var FB_STORE = "shlyapa.fb.v1";
 var FB_MIN = 5, FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
 var S = null, timerRaf = null, lastTick = 0, audio = null, swiping = false, wakeLock = null;
@@ -1510,23 +1510,24 @@ function renderFeedback(){
 
   var form = fbFormOn()
     ? '<div><textarea class="tf ta tfwide" id="fb-text" maxlength="' + FB_MAX + '" ' +
-        'placeholder="Что сломалось или мешало"></textarea>' +
-        '<div class="fbhint"><span>Чем конкретнее, тем лучше</span><span id="fb-count"></span></div></div>' +
-      '<div><div class="fieldlabel">Как ответить, если понадобится</div>' +
+        'placeholder="Что сломалось, что мешало, чего не хватило"></textarea>' +
+        '<div class="fbhint"><span>Чем конкретнее, тем полезнее</span><span id="fb-count"></span></div></div>' +
+      '<div><div class="fieldlabel">Как с вами связаться, если понадобится</div>' +
         '<input class="tf tfwide" type="text" id="fb-contact" maxlength="120" autocomplete="off" ' +
-        'placeholder="Телеграм или почта, необязательно" value="' + esc(contact) + '"></div>' +
+        'placeholder="Необязательно: телеграм или почта" value="' + esc(contact) + '"></div>' +
       /* ловушка для ботов: людям она не видна и всегда пуста */
       '<input id="fb-hp" tabindex="-1" autocomplete="off" aria-hidden="true" ' +
         'style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">' +
-      '<div class="note">Приложим версию, экран и модель телефона. ' +
-        'Имена игроков и слова не отправляем.</div>'
+      '<div class="note">К отзыву приложим отметку сборки, экран, с которого вы пишете, ' +
+        'размер экрана, браузер и устройство, число игроков и настройки партии. ' +
+        'Имена игроков и загаданные слова не отправляются.</div>'
     : '<div class="stub">Форма отзыва ещё не подключена. Напишите напрямую в телеграм.</div>';
 
   inner.innerHTML =
     '<div class="hdr"><div class="hside">' + hbtn("fb-close", IC.back, "Назад") + '</div>' +
     '<div class="htitle">Обратная связь</div><div class="hside right"></div></div>' +
     '<div class="sheetbody"><div class="pad" style="gap:12px">' +
-      '<p>Игра ещё сырая. Расскажите, что не так — починю.</p>' +
+      '<p>Это ранняя версия игры. Расскажите, что пошло не так, и её починят.</p>' +
       form +
     '</div></div>' +
     '<div class="pad" style="flex:none;gap:10px">' +
