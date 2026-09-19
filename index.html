@@ -304,6 +304,15 @@
     border-radius:7px;display:grid;place-items:center;color:transparent}
   .check .box svg{width:14px;height:14px}
   .check[aria-pressed=true] .box{background:var(--accent);border-color:var(--accent);color:#fff}
+  /* перечень в согласии: маркеры тем же серым, что и пояснения */
+  .clist{margin:0;padding-left:18px;color:var(--muted);font-size:13.5px;line-height:1.5}
+  .clist li{margin-bottom:3px}
+  /* переключатель отправки статистики под инструкцией */
+  .anrow{display:flex;align-items:center;gap:10px;padding:13px 2px 2px;
+    border-top:1px solid var(--line);margin-top:14px;font-size:13.5px;color:var(--muted)}
+  .anrow .ant{flex:1;min-width:0}
+  .anrow button{flex:none;border:0;background:none;padding:6px 0;color:var(--accent);
+    font-size:13.5px;font-weight:600;cursor:pointer}
   .fbstatus{font-size:13px;min-height:18px}
   .fbstatus.bad{color:var(--danger)}
   .fbstatus.ok{color:var(--ok)}
@@ -639,6 +648,7 @@
         <div class="overlay" id="o-sheet" hidden><div id="sheet-inner" style="flex:1;min-height:0;display:flex;flex-direction:column"></div></div>
         <div class="overlay" id="o-roster" hidden><div id="roster-inner" style="flex:1;min-height:0;display:flex;flex-direction:column"></div></div>
         <div class="overlay" id="o-fb" hidden><div id="fb-inner" style="flex:1;min-height:0;display:flex;flex-direction:column"></div></div>
+        <div class="overlay" id="o-consent" hidden><div id="consent-inner" style="flex:1;min-height:0;display:flex;flex-direction:column"></div></div>
         <div class="scrollthumb" id="scrollthumb"></div>
       </div>
     </div>
@@ -674,7 +684,7 @@ var STORE = "shlyapa.mvp.v9";
    ============================================================ */
 var FEEDBACK_URL = "https://shlyapa-feedback.grudanovartyom.workers.dev";
 var TELEGRAM_URL = "https://t.me/gentlemad";
-var BUILD = "2026-09-19 10:22 UTC";                 /* сюда build.js подставляет отметку сборки */
+var BUILD = "2026-09-19 14:51 UTC";                 /* сюда build.js подставляет отметку сборки */
 var FB_STORE = "shlyapa.fb.v1";
 var FB_MIN = 5, FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
 /* Счётчик символов висит на экране без дела: показываем, только когда
@@ -689,6 +699,37 @@ var FB_FACES = [
 ];
 var FB_KINDS = ["Поломка", "Неудобство", "Предложение", "Впечатление"];
 var fbRate = 0, fbKind = "", fbReach = false;
+
+/* ============================================================
+   АНАЛИТИКА
+   Событие - одна строка в дневнике приложения: что случилось, когда и
+   несколько чисел рядом. Поодиночке строка бесполезна, а тысяча строк
+   отвечает на вопросы, которые иначе пришлось бы выспрашивать.
+
+   Буфер лежит в localStorage и уходит пачкой. Поэтому пропавшая сеть,
+   блокировщик или закрытая вкладка данных не теряют: они догонят при
+   следующем открытии. Игра от этого слоя не зависит ни в одной точке -
+   упавшая отправка не должна ломать партию.
+
+   Пустой EVENTS_URL выключает отправку, нулевой METRIKA_ID - счётчик.
+   Так страница остаётся рабочей, пока эндпоинт не поднят.
+   ============================================================ */
+var EVENTS_URL = "https://shlyapa-feedback.grudanovartyom.workers.dev/e";
+var METRIKA_ID = 112813431;
+var AN_STORE = "shlyapa.an.v1";
+/* Полным адресом, а не относительным: в артефакте прототипа относительный
+   ссылается в пустоту, а страница политики живёт рядом с боевой сборкой. */
+var PRIVACY_URL = "https://gentlemad.github.io/shlyapa/privacy.html";
+/* Партии подряд за один вечер - одна посиделка. Разрыв больше этого
+   считаем новым заходом: главный критерий продукта живёт на этом уровне. */
+var AN_SIT_GAP_MS = 40 * 60 * 1000;
+var AN_FLUSH_MS = 12000;   /* отправляем не чаще раза в столько */
+var AN_BATCH = 120;        /* сколько событий уходит за раз */
+var AN_MAX = 400;          /* потолок буфера: дальше роняем самые старые */
+var AN_TAIL = 3;           /* столько последних событий прикладываем к обрыву */
+
+var AN = {ok:null, install:"", sit:"", game:"", phase:"", q:[], tail:[], sending:false, timer:null};
+
 var S = null, timerRaf = null, lastTick = 0, audio = null, swiping = false, wakeLock = null;
 
 function sv(d,w){
@@ -1407,10 +1448,24 @@ function renderRules(){
     '</div>';
   }).join("");
 
+  /* Передумать про статистику можно здесь: другого спокойного места в
+     приложении нет, а прятать переключатель совсем - нечестно. */
+  var anBlock = (EVENTS_URL || METRIKA_ID)
+    ? '<div class="anrow"><span class="ant">Отправка статистики: ' +
+        (anOn() ? "включена" : "выключена") + '</span>' +
+        '<button id="an-toggle">' + (anOn() ? "Выключить" : "Включить") + '</button></div>'
+    : "";
+
   el.innerHTML =
     '<div class="tabwrap">' + segHTML("rules-tabs", ["Как играть", "Вопросы"],
       isFaq ? "Вопросы" : "Как играть") + '</div>' +
-    '<div class="pad' + (isFaq ? " faq" : "") + '" style="gap:0">' + rows + '</div>';
+    '<div class="pad' + (isFaq ? " faq" : "") + '" style="gap:0">' + rows + anBlock + '</div>';
+
+  var anT = byId("an-toggle");
+  if(anT) anT.onclick = function(){
+    if(anOn()){ anRevoke(); renderRules(); }
+    else { anPatch({ok:true}); AN.ok = true; anStart(false, null); renderRules(); }
+  };
 
   bindSeg("rules-tabs", function(v){
     var t = (v === "Вопросы") ? "faq" : "how";
@@ -1548,7 +1603,17 @@ function renderSetup(){
   });
   bindSeg("seg-words", function(v){ S.settings.wordsPerPlayer=+v; go(); });
   bindSeg("seg-time",  function(v){ S.settings.turnSeconds=+v; go(); });
-  byId("go-entry").onclick=function(){ S.phase="entry"; S.entryIndex=0; kbHide(); go(); };
+  byId("go-entry").onclick=function(){
+    track("game_configured", {
+      players: S.players.length,
+      names: S.players.map(function(p){ return p.name; }),
+      wordsPerPlayer: S.settings.wordsPerPlayer,
+      turnSeconds: S.settings.turnSeconds,
+      minutes: estimateMinutes()
+    });
+    S.phase="entry"; S.entryIndex=0; S._entryStart=Date.now(); S._wordAt=Date.now();
+    kbHide(); go();
+  };
 }
 function addPlayer(){
   var i=byId("newname"), v=i.value.trim().replace(/\s+/g," "), msg=byId("pmsg");
@@ -1612,17 +1677,27 @@ function renderEntry(){
   if((b=byId("begin"))) b.onclick=beginGame;
   if((b=byId("passnext"))) b.onclick=function(){
     var i=nextUnfinished(S.entryIndex);
-    if(i>=0){ S.entryIndex=i; kbHide(); go(); }
+    if(i>=0){
+      track("entry_player_done", {pi:S.entryIndex, ms:Date.now()-(S._entryStart||Date.now())});
+      S.entryIndex=i; S._entryStart=Date.now(); S._wordAt=Date.now();
+      kbHide(); go();
+    }
   };
 
   function bad(t){ msg.className="hint bad"; msg.textContent=t; }
   function tryAdd(){
     var v=inp.value.trim().replace(/\s+/g," ");
     if(!v){ bad("Пустое поле"); return; }
-    if(v.replace(/[^0-9A-Za-zА-Яа-яЁё]/g,"").length<2){ bad("Нужно хотя бы две буквы"); return; }
-    if(mine.length>=need){ bad("Уже "+num(need,"слово","слова","слов")); return; }
-    if(S.words.some(function(w){ return w.text.toLowerCase()===v.toLowerCase(); })){ bad("Это слово уже в шляпе"); inp.select(); return; }
+    if(v.replace(/[^0-9A-Za-zА-Яа-яЁё]/g,"").length<2){ track("word_rejected",{reason:"short",len:v.length}); bad("Нужно хотя бы две буквы"); return; }
+    if(mine.length>=need){ track("word_rejected",{reason:"full",len:v.length}); bad("Уже "+num(need,"слово","слова","слов")); return; }
+    if(S.words.some(function(w){ return w.text.toLowerCase()===v.toLowerCase(); })){ track("word_rejected",{reason:"dup",len:v.length}); bad("Это слово уже в шляпе"); inp.select(); return; }
     var h=posHint(v);
+    track("word_added", {
+      pi: S.entryIndex, wi: mine.length, w: v, len: v.length,
+      hint: h ? (/глагол/.test(h) ? "verb" : "adj") : "",
+      ms: Date.now() - (S._wordAt || Date.now())
+    });
+    S._wordAt = Date.now();
     S.words.push({id:uid(), text:v, authorId:p.id, returns:0});
     buzz(8);
     go();
@@ -1669,9 +1744,10 @@ function fbFormOn(){ return !!FEEDBACK_URL; }
 function fbTgOn(){ return !!TELEGRAM_URL; }
 function fbAvailable(){ return fbFormOn() || fbTgOn(); }
 
-/* Что уходит вместе с отзывом. Содержимое партии сюда не попадает:
-   имена игроков и загаданные слова - чужие данные, а в шляпе пишут всякое.
-   Счётчики и настройки этого не раскрывают, но дают воспроизвести баг. */
+/* Что уходит вместе с отзывом: счётчики и настройки, чтобы можно было
+   воспроизвести баг. Имена и слова сюда не кладём - не потому, что их
+   нельзя собирать (согласие их перечисляет и они уходят событиями), а
+   потому, что для разбора одного отзыва они не нужны. */
 function fbContext(){
   var vp = window.visualViewport;
   var w = Math.round(vp ? vp.width : window.innerWidth);
@@ -1894,6 +1970,8 @@ function sendFeedback(){
   });
 }
 function fbSent(){
+  track("feedback_sent", {rate:fbRate||0, kind:fbKind||"", screen:fbWhere()});
+  anGoal("feedback_sent");
   fbSet("last", String(Date.now()));
   fbDel("draft");
   fbRate = 0; fbKind = ""; fbReach = false;
@@ -1904,10 +1982,225 @@ function fbSent(){
 }
 
 /* ============================================================
+   АНАЛИТИКА: хранилище, согласие, отправка
+   ============================================================ */
+function anRead(){
+  try{ var r=localStorage.getItem(AN_STORE); return r ? (JSON.parse(r)||{}) : {}; }catch(e){ return {}; }
+}
+function anPatch(o){
+  var d=anRead();
+  for(var k in o) if(Object.prototype.hasOwnProperty.call(o,k)) d[k]=o[k];
+  try{ localStorage.setItem(AN_STORE, JSON.stringify(d)); }catch(e){}
+  return d;
+}
+function anOn(){ return AN.ok === true; }
+
+/* Один раз на устройство: спрашиваем всё сразу и больше не возвращаемся.
+   До ответа не уходит ничего и счётчик не грузится. */
+function anInit(){
+  var d = anRead(), now = Date.now(), first = !d.install;
+  if(first) d.install = uid() + uid();
+
+  var fresh = (!d.sit || !d.seen || (now - d.seen) > AN_SIT_GAP_MS);
+  if(fresh) d.sit = uid() + uid();
+
+  AN.install = d.install;
+  AN.sit = d.sit;
+  AN.ok = (d.ok === true) ? true : ((d.ok === false) ? false : null);
+  AN.q = Array.isArray(d.q) ? d.q.slice(-AN_MAX) : [];
+  AN.tail = [];
+
+  /* Партия, начатая в прошлый раз и не дошедшая до финала. Засчитываем её
+     брошенной только если компания в тот вечер уже не вернулась. */
+  var lost = (fresh && d.open && d.open.game) ? d.open : null;
+
+  anPatch({install:d.install, sit:d.sit, seen:now, q:AN.q, open:lost ? null : (d.open||null)});
+
+  if(AN.ok === true) anStart(first, lost);
+  else if(AN.ok === null) anAsk(first, lost);
+}
+
+function anStart(first, lost){
+  anMetrika();
+  var vp = window.visualViewport;
+  track("app_open", {
+    first: !!first,
+    vw: Math.round(vp ? vp.width : window.innerWidth),
+    vh: Math.round(vp ? vp.height : window.innerHeight),
+    dpr: window.devicePixelRatio || 1,
+    lang: navigator.language || "",
+    reduced: reduced(),
+    standalone: anStandalone(),
+    ref: document.referrer || ""
+  });
+  if(lost) track("game_abandoned", lost);
+  anFlush(false);
+}
+function anStandalone(){
+  try{ return !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches); }catch(e){ return false; }
+}
+
+function track(name, props){
+  if(!anOn()) return;
+  var e = {at: Date.now(), n: name, p: props || {}};
+  if(AN.game) e.g = AN.game;
+  AN.q.push(e);
+  if(AN.q.length > AN_MAX) AN.q = AN.q.slice(-AN_MAX);
+
+  AN.tail.push(name);
+  if(AN.tail.length > AN_TAIL) AN.tail.shift();
+
+  /* Слепок незакрытой партии: если приложение больше не откроют в этот
+     вечер, он уедет следующим запуском как game_abandoned. */
+  var open = null;
+  if(AN.game && S){
+    open = {game:AN.game, phase:S.phase, turnNo:S.turnNo, round:S.round,
+      players:S.players.length, words:S.words.length, tail:AN.tail.slice()};
+  }
+  anPatch({q:AN.q, seen:e.at, open:open});
+  anSchedule();
+}
+
+function anSchedule(){
+  if(AN.timer || !EVENTS_URL || !AN.q.length) return;
+  AN.timer = setTimeout(function(){ AN.timer = null; anFlush(false); }, AN_FLUSH_MS);
+}
+
+/* beacon уходит на выгрузке вкладки: там уже нельзя ждать ответ.
+   Тип text/plain выбран намеренно - с application/json браузер сначала
+   спросил бы разрешение отдельным запросом, а beacon так не умеет. */
+function anFlush(beacon){
+  if(!EVENTS_URL || !anOn() || !AN.q.length || AN.sending) return;
+  var batch = AN.q.slice(0, AN_BATCH), n = batch.length;
+  var body = JSON.stringify({
+    install: AN.install, sit: AN.sit, build: BUILD,
+    ua: navigator.userAgent || "", events: batch
+  });
+
+  if(beacon){
+    try{
+      var blob = new Blob([body], {type:"text/plain;charset=UTF-8"});
+      if(navigator.sendBeacon && navigator.sendBeacon(EVENTS_URL, blob)){
+        AN.q = AN.q.slice(n); anPatch({q:AN.q});
+      }
+    }catch(e){}
+    return;
+  }
+
+  AN.sending = true;
+  fetch(EVENTS_URL, {
+    method:"POST", mode:"cors", headers:{"content-type":"application/json"},
+    body: body, keepalive: true
+  }).then(function(r){
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    AN.q = AN.q.slice(n); anPatch({q:AN.q});
+  }).catch(function(){
+    /* Молча: не отправилось - полежит до следующего раза */
+  }).then(function(){
+    AN.sending = false;
+    if(AN.q.length) anSchedule();
+  });
+}
+
+function anMetrika(){
+  if(!METRIKA_ID || window.ym) return;
+  try{
+    (function(m,e,t,r,i,k,a){
+      m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+      m[i].l=1*new Date();
+      for(var j=0;j<e.scripts.length;j++){ if(e.scripts[j].src===r) return; }
+      k=e.createElement(t);a=e.getElementsByTagName(t)[0];k.async=1;k.src=r;a.parentNode.insertBefore(k,a);
+    })(window, document, "script", "https://mc.yandex.ru/metrika/tag.js?id=" + METRIKA_ID, "ym");
+    window.ym(METRIKA_ID, "init", {
+      ssr:true, webvisor:true, clickmap:true,
+      accurateTrackBounce:true, trackLinks:true
+    });
+  }catch(e){}
+}
+
+/* Метрика строит карты кликов и скроллинга по адресу страницы, а у нас всё
+   приложение живёт на одном адресе. Без виртуальных просмотров карты всех
+   экранов слились бы в одну кашу, и воронка тоже не построилась бы. */
+function anHit(name){
+  if(!METRIKA_ID || !window.ym) return;
+  try{
+    var base = location.pathname.replace(/\/+$/, "");
+    window.ym(METRIKA_ID, "hit", location.origin + base + "/" + name, {title:name});
+  }catch(e){}
+}
+function anGoal(name){
+  if(!METRIKA_ID || !window.ym) return;
+  try{ window.ym(METRIKA_ID, "reachGoal", name); }catch(e){}
+}
+
+/* ---------- согласие ---------- */
+/* Один вопрос на устройство, при первом открытии, и он перечисляет весь
+   состав сразу. Дробить на несколько согласий нельзя: каждое следующее
+   окно люди закрывают не читая, и толку от него нет никому. */
+function anAsk(first, lost){
+  AN._pending = {first: !!first, lost: lost || null};
+  var inner = byId("consent-inner");
+  if(!inner) return;
+  inner.innerHTML =
+    '<div class="pad" style="justify-content:center">'+
+      '<h1>Помогите доработать игру</h1>'+
+      '<p>Приложение может присылать разработчику, как прошла партия:</p>'+
+      '<ul class="clist">'+
+        '<li>сколько секунд ушло на слова и где ход запнулся;</li>'+
+        '<li>имена игроков и придуманные вами слова;</li>'+
+        '<li>модель телефона, размер экрана и версию сборки.</li>'+
+      '</ul>'+
+      '<p>Часть данных обрабатывает Яндекс Метрика. Отказ ничего не ломает: '+
+        'игра работает полностью, просто молча. Передумать можно на экране '+
+        '"Как играть".</p>'+
+      (PRIVACY_URL ? '<p><a href="'+PRIVACY_URL+'" target="_blank" rel="noopener" '+
+        'style="color:var(--accent)">Подробно: что уходит и как это удалить</a></p>' : '')+
+      '<div class="spacer"></div>'+
+      '<div class="actions">'+
+        '<ion-button id="cons-yes" expand="block">Хорошо, помогу</ion-button>'+
+        '<button class="fblink" id="cons-no">Не отправлять</button>'+
+      '</div>'+
+    '</div>';
+  byId("cons-yes").onclick = function(){ anAnswer(true); };
+  byId("cons-no").onclick = function(){ anAnswer(false); };
+  byId("o-consent").hidden = false;
+}
+function anAnswer(ok){
+  byId("o-consent").hidden = true;
+  anPatch({ok: !!ok});
+  AN.ok = !!ok;
+  var p = AN._pending || {};
+  AN._pending = null;
+  if(ok){
+    anStart(p.first, p.lost);
+    track("consent", {ok:true});
+  }
+  if(AN._after){ var f = AN._after; AN._after = null; f(); }
+}
+/* Передумать можно на экране инструкции */
+function anRevoke(){
+  anPatch({ok:false, q:[], open:null});
+  AN.ok = false; AN.q = [];
+}
+
+/* ============================================================
    ИГРА
    ============================================================ */
 function beginGame(){
   kbHide();
+  /* Последний игрок жмёт "Начать партию", а не "Передать", поэтому его
+     время ввода нужно закрыть здесь - иначе в данных не хватало бы ровно
+     того игрока, на котором компания обычно и устаёт. */
+  track("entry_player_done", {pi:S.entryIndex, ms:Date.now()-(S._entryStart||Date.now()), last:true});
+  AN.game = uid() + uid();
+  track("game_started", {
+    players: S.players.length,
+    words: S.words.length,
+    wordsPerPlayer: S.settings.wordsPerPlayer,
+    turnSeconds: S.settings.turnSeconds,
+    setupMs: Date.now() - (S.createdAt || Date.now())
+  });
+  anGoal("game_started");
   S.order=S.players.map(function(p){ return p.id; });
   S.lap=1; S.idx=0; S.round=1; S.round3Turns=0;
   S.hat=shuffle(allIds());
@@ -1941,6 +2234,8 @@ function startTurn(){
     remainingMs:(S.carryMs!==null?S.carryMs:S.settings.turnSeconds*1000),
     startMs:S.settings.turnSeconds*1000, items:[], current:null, streak:0};
   S.carryMs=null;
+  track("turn_started", {no:S.turnNo, round:S.round, ms:S.turn.remainingMs,
+    carry:S.turn.remainingMs !== S.settings.turnSeconds*1000, hat:S.hat.length});
   // Предыдущая пара могла разобрать шляпу до дна: для новой пары свободны все слова
   if(S.round===3 && !S.hat.length) S.hat=round3Refill();
   drawWord();
@@ -2007,7 +2302,11 @@ function bindSwipe(card){
     card.classList.remove("dragging");
     var dy=(e&&typeof e.clientY==="number"?e.clientY:y0)-y0;
     card.style.transform=""; card.style.opacity="";
-    if(dy<-55 && (Date.now()-t0)<1200) flyOut();
+    var ok = (dy<-55 && (Date.now()-t0)<1200);
+    /* Потянули и не дотянули: во втором раунде руки заняты жестами, и
+       именно здесь теряются секунды. Сорванные попытки считаем отдельно. */
+    if(!ok && dy < -8) track("swipe_aborted", {round:S.round, dy:Math.round(dy), ms:Date.now()-t0});
+    if(ok) flyOut();
   }
   card.addEventListener("pointerup",release);
   card.addEventListener("pointercancel",release);
@@ -2057,6 +2356,9 @@ function markGuessed(){
   var gap = Date.now() - (S.wordShownAt || Date.now());
   S.turn.streak = (gap < 8000) ? (S.turn.streak+1) : 1;
   S.turn.items.push({wordId:S.turn.current, guessed:true, round:S.round, ms:gap});
+  track("word_guessed", {round:S.round, ms:gap, streak:S.turn.streak,
+    after: !!S._afterBoundary, no:S.turn.no});
+  S._afterBoundary = false;
   S.turn.current=null;
 
   ping(S.turn.streak);
@@ -2081,6 +2383,8 @@ function markGuessed(){
 function roundBoundary(){
   stopTimer(); wakeOff();
   var frozen = S.turn.remainingMs;
+  track("boundary_shown", {to:S.round+1, frozenMs:frozen, no:S.turn.no});
+  S._boundaryAt = Date.now();
   S.round++;
   S.hat = shuffle(allIds());
   var r = ROUNDS[S.round];
@@ -2108,6 +2412,9 @@ function roundBoundary(){
 }
 
 function resumeAfterBoundary(){
+  /* Сколько держали оверлей: если закрывают за секунду, его не прочитали */
+  track("boundary_resumed", {round:S.round, ms:Date.now()-(S._boundaryAt||Date.now())});
+  S._afterBoundary = true;
   byId("o-flash").hidden = true;
   drawWord();
   S.wordShownAt = Date.now();
@@ -2148,6 +2455,13 @@ function endTurn(){
   }
   S.log.push({no:S.turn.no, ex:S.turn.ex, gu:S.turn.gu,
     startRound:S.turn.startRound, endRound:S.round, items:S.turn.items.slice()});
+  track("turn_ended", {
+    no:S.turn.no, round:S.round, startRound:S.turn.startRound,
+    got:S.turn.items.filter(function(i){ return i.guessed; }).length,
+    missed:S.turn.items.filter(function(i){ return !i.guessed; }).length,
+    reason: S.turn.remainingMs > 0 ? "hat" : "time",
+    exIdx: S.order.indexOf(S.turn.ex), guIdx: S.order.indexOf(S.turn.gu)
+  });
   S.turn = null;          // иначе secsLeft() потом отдаёт 0 на экране передачи
   S.phase="review";
   go();
@@ -2374,7 +2688,11 @@ function bindJournal(root){
     b.onclick=function(){
       var no=+b.dataset.t, i=+b.dataset.i;
       for(var k=0;k<S.log.length;k++){
-        if(S.log[k].no===no){ S.log[k].items[i].guessed=!S.log[k].items[i].guessed; break; }
+        if(S.log[k].no===no){
+          S.log[k].items[i].guessed=!S.log[k].items[i].guessed;
+          track("journal_edited", {no:no, on:S.log[k].items[i].guessed, round:S.log[k].endRound});
+          break;
+        }
       }
       if(S.phase==="results") renderResults(); else renderSheet();
       save();
@@ -2385,6 +2703,9 @@ function bindJournal(root){
 /* ---------- пауза ---------- */
 function openSheet(tab){
   if(S.phase==="turn"){ stopTimer(); wakeOff(); }
+  track("paused", {phase:S.phase, hidden:document.hidden, no:S.turnNo, round:S.round});
+  S._pauseAt=Date.now();
+  anHit("pause");
   S._resume=S.phase;
   S._tab=tab||"score";
   renderSheet();
@@ -2438,13 +2759,16 @@ function renderSheet(){
   requestAnimationFrame(syncSticky);
 }
 function closeSheet(){
+  track("resumed", {phase:S._resume, ms:Date.now()-(S._pauseAt||Date.now())});
   byId("o-sheet").hidden=true;
   if(S._resume==="turn"){ S.phase="turn"; go(); S.wordShownAt=Date.now(); wakeOn(); runTimer(); }
   else { S.phase=S._resume; go(); }
 }
 document.addEventListener("visibilitychange", function(){
+  if(document.hidden){ anFlush(true); }
   if(document.hidden && S && S.phase==="turn"){ openSheet("score"); }
 });
+window.addEventListener("pagehide", function(){ anFlush(true); });
 
 function scores(){
   var m={};
@@ -2510,6 +2834,22 @@ function finish(){
     players:S.players.slice(), scores:sc, settings:S.settings,
     turns:S.log.length, words:S.words.length, titles:snap
   });
+  track("game_finished", {
+    durationMs: Date.now() - (S.createdAt || Date.now()),
+    turns:S.log.length, words:S.words.length, players:S.players.length,
+    round3Turns:S.round3Turns,
+    top: sc.length ? sc[0].pts : 0,
+    low: sc.length ? sc[sc.length-1].pts : 0,
+    /* Разрыв между первым и последним: подозреваемый номер один в том,
+       почему компания не садится за следующую партию */
+    spread: sc.length ? (sc[0].pts - sc[sc.length-1].pts) : 0,
+    names: S.players.map(function(p){ return p.name; }),
+    hat: S.words.map(function(w){ return w.text; })
+  });
+  anGoal("game_finished");
+  AN.game = "";
+  anPatch({open:null});
+  anFlush(false);
 }
 
 function renderResults(){
@@ -2602,6 +2942,12 @@ function go(){
   byId("dots").hidden = !(playing || S.phase === "home");
   if(S.phase !== "home"){ clearInterval(hatTimer); hatTimer = null; }
 
+  if(S.phase !== AN.phase){
+    AN.phase = S.phase;
+    anHit(S.phase);
+    track("screen", {n:S.phase});
+  }
+
   renderBar(); renderCtx(); renderProgress(); renderDev(); save();
   requestAnimationFrame(syncSticky);
 }
@@ -2664,6 +3010,7 @@ function beep(){
 })();
 
 function boot(hot){
+  anInit();
   var restored=(hot&&hot.S)||loadCur();
   if(restored && restored.phase && ["home","setup","results","rules","stats"].indexOf(restored.phase)<0){
     S=restored;

@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FAFCFF">
+<meta name="robots" content="noindex">
+<title>Шляпа — что собирает приложение</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700&display=swap">
+<style>
+  :root{color-scheme:light;
+    --surface:#FAFCFF; --raise:#FFFFFF; --ink:#141820; --muted:#5A6472;
+    --faint:#8A94A4; --line:#CAD2DE; --accent:#1F6FEB;
+    --ui:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--surface);color:var(--ink);font-family:var(--ui);
+    font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:660px;margin:0 auto;padding:32px 16px 72px}
+  h1{font-size:27px;line-height:1.2;letter-spacing:-.02em;margin:0 0 6px}
+  h2{font-size:18px;letter-spacing:-.01em;margin:30px 0 8px}
+  p,li{color:var(--muted);margin:0 0 10px}
+  li{margin-bottom:5px}
+  ul{padding-left:20px;margin:0 0 12px}
+  strong{color:var(--ink)}
+  .date{font-size:13px;color:var(--faint);margin-bottom:22px}
+  .card{background:var(--raise);border:1px solid var(--line);border-radius:14px;
+    padding:15px 16px;margin:16px 0}
+  .card p:last-child{margin-bottom:0}
+  a{color:var(--accent)}
+  .back{display:inline-block;margin-top:26px;font-weight:600;text-decoration:none}
+  @media (prefers-color-scheme:dark){
+    :root{--surface:#12161C; --raise:#181D25; --ink:#E9EDF3; --muted:#A3AEBE;
+      --faint:#6F7A8A; --line:#2A313C; --accent:#5AA9F7; color-scheme:dark}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Что собирает «Шляпа»</h1>
+<div class="date">Обновлено 19 сентября 2026 года</div>
+
+<p>«Шляпа» — любительская игра, которую делает один человек. Сбор данных нужен
+ровно для одного: понять, где игра неудобна, и починить это. Никакой рекламы,
+никакой продажи данных, никакой передачи посторонним.</p>
+
+<div class="card">
+  <p><strong>Отказаться можно в любой момент и без последствий.</strong>
+  Экран «Как играть» → строка «Отправка статистики» → «Выключить».
+  Игра после этого работает полностью, просто ничего не отправляет.</p>
+</div>
+
+<h2>Что уходит</h2>
+<ul>
+  <li><strong>Ход партии:</strong> сколько секунд ушло на каждое слово, сколько
+    слов угадано и пропущено, когда сменился раунд, где ход прервался,
+    сорванные свайпы, правки журнала.</li>
+  <li><strong>Имена игроков</strong> в том виде, в каком их ввели, и
+    <strong>слова, придуманные игроками.</strong> Имена нужны, чтобы понимать,
+    кто играет; слова — чтобы видеть, с каким материалом идёт игра, и замечать
+    те, что её ломают.</li>
+  <li><strong>Настройки партии:</strong> число игроков, слов на игрока, секунд
+    на ход.</li>
+  <li><strong>Устройство:</strong> модель и версия браузера, размер экрана,
+    плотность пикселей, язык системы, версия сборки приложения.</li>
+  <li><strong>Отзыв,</strong> если вы его напишете: текст, оценка, категория и
+    контакт — последний только если вы сами поставите галочку.</li>
+</ul>
+
+<h2>Чего не уходит</h2>
+<ul>
+  <li>Ничего из того, что вы не вводили в приложение: оно не читает контакты,
+    файлы, местоположение и другие приложения.</li>
+  <li>Счёт партии и история не покидают телефон сами по себе — они лежат в
+    памяти браузера и стираются вместе с данными сайта.</li>
+</ul>
+
+<h2>Кто обрабатывает</h2>
+<ul>
+  <li><strong>Cloudflare</strong> — хранит события и пересылает отзывы.</li>
+  <li><strong>Telegram</strong> — туда приходят отзывы.</li>
+  <li><strong>Яндекс Метрика</strong> — считает посещения, строит карты нажатий
+    и прокрутки и записывает действия на экране (Вебвизор). Метрика ставит свои
+    cookie и подчиняется
+    <a href="https://yandex.ru/legal/confidential/">своим правилам</a>.
+    Записи Вебвизора хранятся у Яндекса 15 дней.</li>
+</ul>
+
+<h2>Сколько хранится</h2>
+<p>События — пока идёт разработка игры. Когда надобность отпадёт, база будет
+удалена целиком. Отзывы живут в переписке телеграма.</p>
+
+<h2>Как удалить своё</h2>
+<p>Напишите в телеграм <a href="https://t.me/gentlemad">@gentlemad</a> и скажите,
+когда примерно играли. Данные за эту партию будут удалены. Чтобы стереть всё,
+что хранится на самом телефоне, очистите данные сайта в настройках браузера.</p>
+
+<h2>Если играют дети</h2>
+<p>Игра рассчитана на компанию взрослых. Если за телефоном дети, решение о
+согласии принимает взрослый, который его держит.</p>
+
+<a class="back" href="./">← Вернуться к игре</a>
+
+</div>
+</body>
+</html>
