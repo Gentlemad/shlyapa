@@ -8,23 +8,48 @@
   без рельсы состояний и без корпуса телефона.
 
   Запуск: node build.js
+
+  Превью: node build.js --from dev --out preview.html
+  Берёт исходник из указанной ветки, не трогая рабочее дерево, и кладёт
+  рядом с боевой страницей. Так обкатанное и необкатанное лежат по разным
+  адресам, а index.html меняется только осознанно.
 */
 
 const fs = require("fs");
 const path = require("path");
+const { execFileSync } = require("child_process");
 
+const args = process.argv.slice(2);
+function arg(name){
+  const i = args.indexOf(name);
+  return i >= 0 ? args[i + 1] : null;
+}
+const FROM = arg("--from");
 const SRC = path.join(__dirname, "src", "shlyapa.html");
-const OUT = path.join(__dirname, "index.html");
+const OUT = path.join(__dirname, arg("--out") || "index.html");
 
 const TITLE = "Шляпа";
 const DESC = "Объясняйте и угадывайте собственные слова в различных форматах";
 
-function build(){
+function readSource(){
+  // Из ветки читаем через git: рабочее дерево при этом остаётся нетронутым
+  if(FROM){
+    try{
+      return execFileSync("git", ["show", FROM + ":src/shlyapa.html"], {encoding:"utf8", cwd:__dirname});
+    }catch(e){
+      console.error("Не вышло прочитать src/shlyapa.html из ветки " + FROM);
+      process.exit(1);
+    }
+  }
   if(!fs.existsSync(SRC)){
     console.error("Не найден исходник: " + SRC);
     process.exit(1);
   }
-  const src = fs.readFileSync(SRC, "utf8");
+  return fs.readFileSync(SRC, "utf8");
+}
+
+function build(){
+  const src = readSource();
 
   // Исходник устроен так: <title>, ссылки на шрифты, <style>...</style>, затем разметка и скрипты
   const cut = src.indexOf("</style>");
@@ -79,7 +104,8 @@ ${body.trim()}
 
   fs.writeFileSync(OUT, out, "utf8");
   const kb = (Buffer.byteLength(out, "utf8") / 1024).toFixed(1);
-  console.log("Готово: index.html, " + kb + " КБ");
+  console.log("Готово: " + path.basename(OUT) + ", " + kb + " КБ" +
+    (FROM ? " (исходник из ветки " + FROM + ")" : ""));
 }
 
 build();
