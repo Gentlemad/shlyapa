@@ -189,6 +189,24 @@
   /* .tf растягивается через flex внутри .tfrow; в одиночку ширину задаём сами */
   .tfwide{width:100%;display:block}
   .fbhint{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--faint)}
+  /* оценка: пять лиц, невыбранные приглушены, чтобы выбранное читалось сразу */
+  .rate{display:flex;gap:6px}
+  .rateb{flex:1;min-width:0;height:52px;border:1px solid var(--line);border-radius:12px;
+    background:var(--raise);font-size:25px;line-height:1;cursor:pointer;padding:0;
+    filter:grayscale(1);opacity:.45;transition:opacity .15s ease,filter .15s ease,border-color .15s ease}
+  .rateb[aria-pressed=true]{filter:none;opacity:1;border-color:var(--accent);
+    box-shadow:inset 0 0 0 1px var(--accent)}
+  /* категории переносятся на вторую строку: подписи длиннее, чем влезает в сегменты */
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chipb{border:1px solid var(--line);background:var(--raise);color:var(--muted);
+    border-radius:999px;padding:8px 13px;font-size:13.5px;font-weight:500;cursor:pointer}
+  .chipb[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+  .check{display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+    border:0;background:none;padding:2px 0;cursor:pointer;font-size:14px;color:var(--ink)}
+  .check .box{flex:none;width:22px;height:22px;border:1px solid var(--line-strong);
+    border-radius:7px;display:grid;place-items:center;color:transparent}
+  .check .box svg{width:14px;height:14px}
+  .check[aria-pressed=true] .box{background:var(--accent);border-color:var(--accent);color:#fff}
   .fbstatus{font-size:13px;min-height:18px}
   .fbstatus.bad{color:var(--danger)}
   .fbstatus.ok{color:var(--ok)}
@@ -197,8 +215,11 @@
     border:1px solid var(--accent);border-radius:11px;color:var(--accent);background:transparent;
     font-size:15px;font-weight:600;text-decoration:none;padding:0 14px}
   .linkbtn svg{width:17px;height:17px}
-  .fblink{background:none;border:0;padding:0;color:var(--accent);font-size:14px;
-    font-weight:600;cursor:pointer;text-align:center}
+  .fblink{background:none;border:0;padding:6px 0;color:var(--accent);font-size:14px;
+    font-weight:600;cursor:pointer;display:inline-flex;align-items:center;
+    justify-content:center;gap:7px}
+  .fblink .hornic{width:17px;height:17px;display:block;flex:none}
+  .linkbtn .tgi{width:19px;height:19px;display:block;flex:none}
   .addbtn{flex:none;height:42px;padding:0 16px;border:1px solid var(--accent);background:transparent;
     color:var(--accent);border-radius:11px;font-size:14px;font-weight:600;cursor:pointer}
   .addbtn:hover:not(:disabled){background:var(--accent-soft)}
@@ -551,9 +572,21 @@ var STORE = "shlyapa.mvp.v9";
    ============================================================ */
 var FEEDBACK_URL = "https://shlyapa-feedback.grudanovartyom.workers.dev";
 var TELEGRAM_URL = "https://t.me/gentlemad";
-var BUILD = "2026-09-19 08:52 UTC";                 /* сюда build.js подставляет отметку сборки */
+var BUILD = "2026-09-19 09:25 UTC";                 /* сюда build.js подставляет отметку сборки */
 var FB_STORE = "shlyapa.fb.v1";
 var FB_MIN = 5, FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
+/* Счётчик символов висит на экране без дела: показываем, только когда
+   до предела остаётся меньше этого запаса. */
+var FB_COUNT_FROM = 200;
+var FB_FACES = [
+  {face:"\uD83D\uDE21", label:"Совсем плохо"},
+  {face:"\uD83D\uDE41", label:"Не понравилось"},
+  {face:"\uD83D\uDE10", label:"Нормально"},
+  {face:"\uD83D\uDE42", label:"Понравилось"},
+  {face:"\uD83E\uDD29", label:"Отлично"}
+];
+var FB_KINDS = ["Поломка", "Неудобство", "Идея", "Впечатление"];
+var fbRate = 0, fbKind = "", fbReach = false;
 var S = null, timerRaf = null, lastTick = 0, audio = null, swiping = false, wakeLock = null;
 
 function sv(d,w){
@@ -596,7 +629,13 @@ var IC = {
   smile: sv('<circle cx="12" cy="12" r="9"/><path d="M8.5 14.2c.9 1.2 2.1 1.8 3.5 1.8s2.6-.6 3.5-1.8"/><path d="M9 9.5h.01M15 9.5h.01"/>'),
   rake:  sv('<path d="M12 21V11"/><path d="M5 11h14"/><path d="M5 11V7M9.7 11V7M14.3 11V7M19 11V7"/>'),
   send:  sv('<path d="M21 3L10.5 13.5"/><path d="M21 3l-6.8 18-3.7-7.5L3 9.8z"/>'),
-  chat:  sv('<path d="M20 13.5a3 3 0 0 1-3 3H9l-4.5 3.5v-3.5a3 3 0 0 1-1-2.2V7a3 3 0 0 1 3-3h10.5a3 3 0 0 1 3 3z"/>')
+  /* Логотип телеграма: сплошная фигура, поэтому рисуется заливкой, а не обводкой */
+  tg:    '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">'+
+         '<path d="M21.94 4.58 18.9 19.2c-.23 1.02-.84 1.27-1.7.79l-4.7-3.47-2.27 2.19c-.25.25-.46.46-.95.46l.34-4.8 8.73-7.9c.38-.34-.08-.53-.59-.19L6.97 12.9l-4.65-1.45c-1.01-.32-1.03-1.01.21-1.5l18.17-7.02c.84-.31 1.58.2 1.24 1.65z"/></svg>',
+  /* Мегафон: обводка, как у остальных значков интерфейса */
+  horn:  sv('<path d="M4 9.5v5a1.5 1.5 0 0 0 1.5 1.5H8l9 4.5V5L8 9.5H5.5A1.5 1.5 0 0 0 4 11z"/>'+
+            '<path d="M7.5 16v3.2a1.3 1.3 0 0 0 1.3 1.3h1.2"/>'+
+            '<path d="M20 9.8a3.4 3.4 0 0 1 0 4.4"/>')
 };
 
 /* головные уборы для главного экрана */
@@ -1173,7 +1212,8 @@ function renderHome(){
           '<span style="display:inline-flex;align-items:center;gap:7px">'+
           '<span style="width:17px;height:17px;display:block">'+IC.help+'</span>Как играть</span></ion-button>'+
       '</div>'+
-      (fbAvailable() ? '<button class="fblink" id="h-fb">Написать автору</button>' : '')+
+      (fbAvailable() ? '<button class="fblink" id="h-fb">'+
+        '<span class="hornic">'+IC.horn+'</span>Поделиться обратной связью</button>' : '')+
     '</div>';
 
   mountHats();
@@ -1498,37 +1538,50 @@ function fbStatus(text, cls){
 }
 function fbCount(){
   var t = byId("fb-text"), c = byId("fb-count");
-  if(t && c) c.textContent = t.value.length + " / " + FB_MAX;
+  if(!t || !c) return;
+  var left = FB_MAX - t.value.length;
+  c.textContent = (left <= FB_COUNT_FROM) ? ("осталось " + left) : "";
 }
 
 function renderFeedback(){
   var inner = byId("fb-inner"), draft = fbGet("draft") || "", contact = fbGet("contact") || "";
   var tg = fbTgOn()
     ? '<a class="linkbtn" id="fb-tg" href="' + esc(TELEGRAM_URL) + '" target="_blank" rel="noopener noreferrer">' +
-        IC.chat + 'Написать в телеграм</a>'
+        '<span class="tgi">' + IC.tg + '</span>Написать в телеграм</a>'
     : "";
 
+  var rate = '<div><div class="fieldlabel">Как вам игра</div><div class="rate" id="fb-rate">' +
+    FB_FACES.map(function(f, i){
+      return '<button class="rateb" data-rate="' + (i + 1) + '" aria-pressed="' + (fbRate === i + 1) +
+        '" aria-label="' + esc(f.label) + '" title="' + esc(f.label) + '">' + f.face + '</button>';
+    }).join("") + '</div></div>';
+
+  var chips = '<div><div class="fieldlabel">Это скорее</div><div class="chips" id="fb-kind">' +
+    FB_KINDS.map(function(k){
+      return '<button class="chipb" data-kind="' + esc(k) + '" aria-pressed="' + (fbKind === k) + '">' +
+        esc(k) + '</button>';
+    }).join("") + '</div></div>';
+
   var form = fbFormOn()
-    ? '<div><textarea class="tf ta tfwide" id="fb-text" maxlength="' + FB_MAX + '" ' +
-        'placeholder="Что сломалось или мешало"></textarea>' +
+    ? rate + chips +
+      '<div><textarea class="tf ta tfwide" id="fb-text" maxlength="' + FB_MAX + '" ' +
+        'placeholder="Расскажите своими словами"></textarea>' +
         '<div class="fbhint"><span>Чем конкретнее, тем лучше</span><span id="fb-count"></span></div></div>' +
-      '<div><div class="fieldlabel">Как ответить, если понадобится</div>' +
+      '<div style="display:flex;flex-direction:column;gap:8px">' +
+        '<button class="check" id="fb-reach" aria-pressed="' + fbReach + '">' +
+          '<span class="box">' + IC.check + '</span>Можно связаться со мной</button>' +
         '<input class="tf tfwide" type="text" id="fb-contact" maxlength="120" autocomplete="off" ' +
-        'placeholder="Телеграм или почта, необязательно" value="' + esc(contact) + '"></div>' +
+          'placeholder="Телеграм или почта" value="' + esc(contact) + '"' +
+          (fbReach ? "" : " hidden") + '></div>' +
       /* ловушка для ботов: людям она не видна и всегда пуста */
       '<input id="fb-hp" tabindex="-1" autocomplete="off" aria-hidden="true" ' +
-        'style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">' +
-      '<div class="note">Приложим версию, экран и модель телефона. ' +
-        'Имена игроков и слова не отправляем.</div>'
+        'style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">'
     : '<div class="stub">Форма отзыва ещё не подключена. Напишите напрямую в телеграм.</div>';
 
   inner.innerHTML =
     '<div class="hdr"><div class="hside">' + hbtn("fb-close", IC.back, "Назад") + '</div>' +
     '<div class="htitle">Обратная связь</div><div class="hside right"></div></div>' +
-    '<div class="sheetbody"><div class="pad" style="gap:12px">' +
-      '<p>Игра ещё сырая. Расскажите, что не так — починю.</p>' +
-      form +
-    '</div></div>' +
+    '<div class="sheetbody"><div class="pad" style="gap:14px">' + form + '</div></div>' +
     '<div class="pad" style="flex:none;gap:10px">' +
       '<div class="fbstatus" id="fb-status"></div>' +
       (fbFormOn() ? '<ion-button id="fb-send" expand="block">' +
@@ -1538,6 +1591,21 @@ function renderFeedback(){
     '</div>';
 
   byId("fb-close").onclick = closeFeedback;
+
+  inner.querySelectorAll("[data-rate]").forEach(function(b){
+    b.onclick = function(){
+      var v = +b.dataset.rate;
+      fbRate = (fbRate === v) ? 0 : v;     // повторный тап снимает оценку
+      buzz(8); fbStatus(""); renderFeedback();
+    };
+  });
+  inner.querySelectorAll("[data-kind]").forEach(function(b){
+    b.onclick = function(){
+      fbKind = (fbKind === b.dataset.kind) ? "" : b.dataset.kind;
+      fbStatus(""); renderFeedback();
+    };
+  });
+
   var t = byId("fb-text");
   if(t){
     t.value = draft;
@@ -1546,6 +1614,17 @@ function renderFeedback(){
   }
   var c = byId("fb-contact");
   if(c) c.oninput = function(){ fbSet("contact", c.value); };
+  var r = byId("fb-reach");
+  if(r) r.onclick = function(){
+    fbReach = !fbReach;
+    var f = byId("fb-contact");
+    if(f){
+      f.hidden = !fbReach;
+      if(fbReach){ try{ f.focus(); }catch(e){} } else { f.value = ""; fbSet("contact", ""); }
+    }
+    r.setAttribute("aria-pressed", fbReach);
+    requestAnimationFrame(syncSticky);
+  };
   var b = byId("fb-send");
   if(b) b.onclick = sendFeedback;
   requestAnimationFrame(syncSticky);
@@ -1556,7 +1635,10 @@ function sendFeedback(){
   if(!t) return;
   if(hp && hp.value){ fbSent(); return; }        // бот заполнил ловушку: молча прощаемся
   var text = t.value.trim();
-  if(text.length < FB_MIN){ fbStatus("Напишите хотя бы пару слов", "bad"); try{ t.focus(); }catch(e){} return; }
+  /* Одной оценки или категории достаточно: человек не обязан ничего писать,
+     чтобы сказать, что игра понравилась. */
+  if(!text && !fbRate && !fbKind){ fbStatus("Поставьте оценку или напишите пару слов", "bad"); return; }
+  if(text && text.length < FB_MIN){ fbStatus("Слишком коротко", "bad"); try{ t.focus(); }catch(e){} return; }
 
   var last = +(fbGet("last") || 0);
   var wait = Math.ceil((FB_COOLDOWN_MS - (Date.now() - last)) / 1000);
@@ -1572,7 +1654,13 @@ function sendFeedback(){
 
   fetch(FEEDBACK_URL, {
     method: "POST", mode: "cors", headers: {"content-type": "application/json"},
-    body: JSON.stringify({text: text, contact: (c ? c.value.trim().slice(0,120) : ""), ctx: fbContext()}),
+    body: JSON.stringify({
+      text: text,
+      rate: fbRate || null,
+      kind: fbKind || "",
+      contact: (fbReach && c) ? c.value.trim().slice(0,120) : "",
+      ctx: fbContext()
+    }),
     signal: ctrl ? ctrl.signal : undefined
   }).then(function(r){
     if(!r.ok) throw new Error("HTTP " + r.status);
@@ -1590,10 +1678,9 @@ function sendFeedback(){
 function fbSent(){
   fbSet("last", String(Date.now()));
   fbDel("draft");
-  var t = byId("fb-text");
-  if(t){ t.value = ""; fbCount(); }
-  var b = byId("fb-send");
-  if(b) b.disabled = false;
+  fbRate = 0; fbKind = ""; fbReach = false;
+  fbSet("contact", "");
+  renderFeedback();
   fbStatus("Спасибо, отзыв ушёл", "ok");
   buzz(12);
 }
