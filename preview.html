@@ -1,3 +1,13 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FAFCFF">
+<meta name="description" content="Объясняйте и угадывайте собственные слова в различных форматах">
+<meta property="og:title" content="Шляпа">
+<meta property="og:description" content="Объясняйте и угадывайте собственные слова в различных форматах">
+<meta name="robots" content="noindex">
 <title>Шляпа MVP</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -467,17 +477,9 @@
     .dotlayer,.screen.enter,.overlay,.mood,.radarpoly{animation:none}
   }
 </style>
-
+</head>
+<body class="appmode">
 <div class="bench">
-  <aside class="rail">
-    <div class="railtop">
-      <div class="raileyebrow">прототип</div>
-      <div class="railname">Шляпа</div>
-    </div>
-    <div class="railstates" id="dev-chips"></div>
-    <button class="railreset" id="dev-reset">Сбросить состояние</button>
-    <div class="railnote">Сброс возвращает выбранное состояние в начальную точку, а не всю партию.</div>
-  </aside>
 
   <div class="stage">
     <div class="phone">
@@ -514,7 +516,6 @@
         <div class="overlay" id="o-sheet" hidden><div id="sheet-inner" style="flex:1;min-height:0;display:flex;flex-direction:column"></div></div>
         <div class="overlay" id="o-roster" hidden><div id="roster-inner" style="flex:1;min-height:0;display:flex;flex-direction:column"></div></div>
         <div class="overlay" id="o-fb" hidden><div id="fb-inner" style="flex:1;min-height:0;display:flex;flex-direction:column"></div></div>
-        <div class="kb" id="kb"></div>
         <div class="scrollthumb" id="scrollthumb"></div>
       </div>
     </div>
@@ -550,7 +551,7 @@ var STORE = "shlyapa.mvp.v9";
    ============================================================ */
 var FEEDBACK_URL = "https://shlyapa-feedback.grudanovartyom.workers.dev";
 var TELEGRAM_URL = "https://t.me/gentlemad";
-var BUILD = "dev";                 /* сюда build.js подставляет отметку сборки */
+var BUILD = "2026-09-19 08:51 UTC";                 /* сюда build.js подставляет отметку сборки */
 var FB_STORE = "shlyapa.fb.v1";
 var FB_MIN = 5, FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
 var S = null, timerRaf = null, lastTick = 0, audio = null, swiping = false, wakeLock = null;
@@ -1509,23 +1510,24 @@ function renderFeedback(){
 
   var form = fbFormOn()
     ? '<div><textarea class="tf ta tfwide" id="fb-text" maxlength="' + FB_MAX + '" ' +
-        'placeholder="Что сломалось или мешало"></textarea>' +
-        '<div class="fbhint"><span>Чем конкретнее, тем лучше</span><span id="fb-count"></span></div></div>' +
-      '<div><div class="fieldlabel">Как ответить, если понадобится</div>' +
+        'placeholder="Что сломалось, что мешало, чего не хватило"></textarea>' +
+        '<div class="fbhint"><span>Чем конкретнее, тем полезнее</span><span id="fb-count"></span></div></div>' +
+      '<div><div class="fieldlabel">Как с вами связаться, если понадобится</div>' +
         '<input class="tf tfwide" type="text" id="fb-contact" maxlength="120" autocomplete="off" ' +
-        'placeholder="Телеграм или почта, необязательно" value="' + esc(contact) + '"></div>' +
+        'placeholder="Необязательно: телеграм или почта" value="' + esc(contact) + '"></div>' +
       /* ловушка для ботов: людям она не видна и всегда пуста */
       '<input id="fb-hp" tabindex="-1" autocomplete="off" aria-hidden="true" ' +
         'style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">' +
-      '<div class="note">Приложим версию, экран и модель телефона. ' +
-        'Имена игроков и слова не отправляем.</div>'
+      '<div class="note">К отзыву приложим отметку сборки, экран, с которого вы пишете, ' +
+        'размер экрана, браузер и устройство, число игроков и настройки партии. ' +
+        'Имена игроков и загаданные слова не отправляются.</div>'
     : '<div class="stub">Форма отзыва ещё не подключена. Напишите напрямую в телеграм.</div>';
 
   inner.innerHTML =
     '<div class="hdr"><div class="hside">' + hbtn("fb-close", IC.back, "Назад") + '</div>' +
     '<div class="htitle">Обратная связь</div><div class="hside right"></div></div>' +
     '<div class="sheetbody"><div class="pad" style="gap:12px">' +
-      '<p>Игра ещё сырая. Расскажите, что не так — починю.</p>' +
+      '<p>Это ранняя версия игры. Расскажите, что пошло не так, и её починят.</p>' +
       form +
     '</div></div>' +
     '<div class="pad" style="flex:none;gap:10px">' +
@@ -2384,3 +2386,5 @@ try{
 
 })();
 </script>
+</body>
+</html>
