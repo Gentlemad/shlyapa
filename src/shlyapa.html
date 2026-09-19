@@ -770,6 +770,25 @@ function shuffle(a){
   for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i];a[i]=a[j];a[j]=t; }
   return a;
 }
+/* Пары берутся из круга подряд, поэтому цепочку задаёт не сам порядок, а его
+   цикл: любой поворот списка даёт ровно те же пары в той же
+   последовательности. Из n! перестановок таких поворотов n штук, и на трёх
+   игроках это каждый второй бросок - люди замечают, что круг "не изменился". */
+function sameCycle(a, b){
+  var n=a.length;
+  if(n!==b.length) return false;
+  var at=b.indexOf(a[0]);
+  if(at<0) return false;
+  for(var k=0;k<n;k++) if(a[k]!==b[(at+k)%n]) return false;
+  return true;
+}
+function reshuffleOrder(prev){
+  for(var tries=0; tries<60; tries++){
+    var next=shuffle(prev);
+    if(!sameCycle(prev,next)) return next;
+  }
+  return prev;   // до сюда не доходит: непроворотных перестановок всегда больше
+}
 function esc(s){
   return String(s).replace(/[&<>"']/g,function(c){
     return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
@@ -1320,8 +1339,7 @@ function renderHome(){
           '<span style="display:inline-flex;align-items:center;gap:7px">'+
           '<span style="width:17px;height:17px;display:block">'+IC.help+'</span>Как играть</span></ion-button>'+
       '</div>'+
-      (fbAvailable() ? '<button class="fblink" id="h-fb">'+
-        '<span class="hornic">'+IC.horn+'</span>Поделиться обратной связью</button>' : '')+
+      (fbAvailable() ? fbLink("h-fb") : '')+
     '</div>';
 
   mountHats();
@@ -1664,6 +1682,12 @@ function fbGet(k){ try{ return localStorage.getItem(FB_STORE+"."+k); }catch(e){ 
 function fbSet(k,v){ try{ localStorage.setItem(FB_STORE+"."+k, v); }catch(e){} }
 function fbDel(k){ try{ localStorage.removeItem(FB_STORE+"."+k); }catch(e){} }
 
+/* Один и тот же вход с трёх экранов: разные надписи читались как разные
+   возможности, хотя ведут в одно место. */
+function fbLink(id){
+  return '<button class="fblink" id="' + id + '">' +
+    '<span class="hornic">' + IC.horn + '</span>Поделиться обратной связью</button>';
+}
 function fbFormOn(){ return !!FEEDBACK_URL; }
 function fbTgOn(){ return !!TELEGRAM_URL; }
 function fbAvailable(){ return fbFormOn() || fbTgOn(); }
@@ -2323,7 +2347,7 @@ function advanceState(){
   S.idx++;
   if(S.idx>=n){
     S.idx=0; S.lap++;
-    if(S.round!==3) S.order=shuffle(S.order);
+    if(S.round!==3) S.order=reshuffleOrder(S.order);
   }
   return false;
 }
@@ -2421,7 +2445,7 @@ function renderSheet(){
     '<div class="pad" style="flex:none;gap:10px">'+ resumeLine()+
       '<ion-button id="resume" expand="block">Вернуться в игру</ion-button>'+
       '<ion-button id="abandon" expand="block" fill="outline" color="medium">Завершить партию досрочно</ion-button>'+
-      (fbAvailable() ? '<button class="fblink" id="sh-fb">Сообщить о проблеме</button>' : '')+
+      (fbAvailable() ? fbLink("sh-fb") : '')+
     '</div>';
 
   bindSeg("sh-tabs", function(v){
@@ -2554,7 +2578,7 @@ function renderResults(){
         '<span style="display:inline-flex;align-items:center;gap:8px">'+
         '<span style="width:17px;height:17px;display:block">'+IC.repeat+'</span>Сыграть тем же составом</span>'+
       '</ion-button>'+
-      (fbAvailable() ? '<button class="fblink" id="res-fb">Рассказать, как вам игра</button>' : '')+
+      (fbAvailable() ? fbLink("res-fb") : '')+
       '</div>'+
     '</div>';
 
