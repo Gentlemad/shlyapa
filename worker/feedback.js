@@ -53,8 +53,10 @@ export default {
     if (!env.BOT_TOKEN || !env.CHAT_ID) return json({ error: "not configured" }, 500, cors);
 
     const ctx = body.ctx && typeof body.ctx === "object" ? body.ctx : {};
-    const ip = request.headers.get("cf-connecting-ip") || "";
-    const country = request.cf && request.cf.country ? request.cf.country : "";
+
+    /* IP и страну сознательно не берём, хотя Cloudflare их подаёт: форма
+       перечисляет пользователю, что именно уходит с отзывом, и этого там нет.
+       Добавлять сюда поля, не названные в форме, нельзя. */
 
     const message =
       "<b>Отзыв о Шляпе</b>\n\n" +
@@ -66,9 +68,7 @@ export default {
       "<b>Устройство:</b> " + esc(ctx.viewport) + " @" + esc(ctx.dpr) +
         ", " + esc(ctx.lang) + (ctx.reducedMotion ? ", уменьшение движения" : "") +
         (ctx.standalone ? ", с домашнего экрана" : "") + "\n" +
-      "<b>Браузер:</b> <code>" + esc(ctx.ua) + "</code>" +
-      (country ? "\n<b>Страна:</b> " + esc(country) : "") +
-      (ip ? "\n<b>IP:</b> <code>" + esc(ip) + "</code>" : "");
+      "<b>Браузер:</b> <code>" + esc(ctx.ua) + "</code>";
 
     const tg = await fetch("https://api.telegram.org/bot" + env.BOT_TOKEN + "/sendMessage", {
       method: "POST",
@@ -93,9 +93,17 @@ export default {
 function describeGame(ctx) {
   if (!ctx.players) return "не начата";
   const s = ctx.settings || {};
-  return ctx.players + " игроков, " + ctx.words + " слов, раунд " + ctx.round +
+  return num(ctx.players, "игрок", "игрока", "игроков") + ", " +
+    num(ctx.words, "слово", "слова", "слов") + ", раунд " + ctx.round +
     ", ход " + ctx.turnNo + ", в шляпе " + ctx.hatLeft +
-    " (по " + s.wordsPerPlayer + " слов, " + s.turnSeconds + " с)";
+    " (по " + num(s.wordsPerPlayer, "слову", "слова", "слов") +
+    ", " + s.turnSeconds + " с)";
+}
+/* Те же правила склонения, что и в приложении */
+function num(n, a, b, c) {
+  const x = Math.abs(Number(n)) % 100, y = x % 10;
+  const word = (x > 10 && x < 20) ? c : (y > 1 && y < 5) ? b : (y === 1) ? a : c;
+  return n + " " + word;
 }
 function esc(v) {
   return String(v === undefined || v === null ? "-" : v)
