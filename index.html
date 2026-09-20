@@ -177,6 +177,15 @@
   .pairbox .pra{flex:none;display:grid;place-items:center;color:var(--faint)}
   .pairbox .pra svg{width:15px;height:15px}
 
+  /* подсказка: заметная, но тише заголовка - она помогает, а не командует */
+  .hintbox{display:flex;gap:7px;align-items:flex-start;width:100%;text-align:left;
+    border:0;cursor:pointer;background:var(--accent-soft);border-radius:12px;
+    padding:11px 13px;font-size:13.5px;line-height:1.4;color:var(--ink)}
+  .hintbox .hl{flex:none;font-weight:700;color:var(--accent)}
+  .hintbox .hq{flex:1;min-width:0}
+  .hintbox .hq.swap{animation:hintIn .32s cubic-bezier(.2,.7,.3,1)}
+  @keyframes hintIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+
   .tfrow{display:flex;gap:8px;align-items:stretch;height:42px}
   /* 16px обязательны: на меньшем кегле Safari на айфоне зумит страницу при фокусе */
   .tf{flex:1;min-width:0;height:42px;font-family:var(--ui);font-size:16px;padding:0 13px;color:var(--ink);
@@ -593,7 +602,7 @@
     .card,.kb,.hatstack .hi{transition:none}
     .plusone,.streak,.winner .cup,.fmt b.pop,.hero,.lastgame,.homebtns,
     .dotlayer,.screen.enter,.overlay,.mood,.radarpoly,
-    .dphone,.dword,.dcard,.dplus,.dmode,.dscore,.toast{animation:none}
+    .dphone,.dword,.dcard,.dplus,.dmode,.dscore,.toast,.hintbox .hq.swap{animation:none}
     /* без анимации фреймы показывают конечное состояние, а не пустоту */
     .dword,.dplus,.dscore{opacity:1}
     .dcard.back{opacity:1;transform:none}
@@ -663,6 +672,65 @@ var SEED_WORDS = ["чайник","парус","совесть","лестница
   "колея","пельмень","ветка","зонтик","провод","карусель","бухта","сугроб","телега",
   "полынь","мозоль","фонарь","плед","ссора"];
 
+/* Наводящие вопросы на экране ввода слов. Ввод - самое провисающее место
+   партии: все хотят придумать что-то хитрое и застревают. Вопрос сдвигает с
+   мёртвой точки, не подсказывая само слово.
+
+   Тон: дерзко-бытовой, без тем, неуместных при детях, - в игру играют семьями.
+   Список расширяется свободно, порядок задаётся колодой в nextHint. */
+var HINTS = [
+  "Какое слово крутится у вас в голове чаще всего?",
+  "Как вас ласково называют дома?",
+  "Что вы ищете дольше всего, хотя оно всегда рядом?",
+  "Без чего вы не выходите из дома?",
+  "Что лежит у вас в кармане прямо сейчас?",
+  "Что вы обещали починить ещё весной?",
+  "Что лежит без дела, но выбросить жалко?",
+  "Какая вещь переезжает с вами уже много лет?",
+  "Что вы теряете чаще всего?",
+  "Что вы точно забудете взять в поездку?",
+  "Чего в вашем доме подозрительно много?",
+  "Что вы никому не одолжите?",
+  "Что у вас сломалось последним?",
+  "Что вы прячете, когда приходят гости?",
+  "Что вам подарили, а вы так и не поняли зачем?",
+  "Что бы вы съели прямо сейчас?",
+  "Что вы умеете готовить с закрытыми глазами?",
+  "Что вы едите, когда никто не видит?",
+  "Какой продукт вы больше никогда не купите?",
+  "Что вы кладёте в холодильник и забываете там навсегда?",
+  "Что вас искренне бесит?",
+  "Какой звук вы узнаете из тысячи и ненавидите?",
+  "Что портит вам утро быстрее всего?",
+  "Какое слово вы слышите на работе слишком часто?",
+  "Что вы обходите стороной?",
+  "Значение какого слова вы так и не поняли?",
+  "Какое новомодное слово кажется вам бессмыслицей?",
+  "Какое слово вы сами не смогли бы объяснить?",
+  "Какое слово вы сами не смогли бы угадать?",
+  "Какое слово вы стабильно пишете с ошибкой?",
+  "Какое слово вы выдумали сами?",
+  "Какое слово стоило бы запретить?",
+  "Какое слово звучит красивее, чем то, что оно значит?",
+  "Какое слово вы говорите чаще, чем думаете?",
+  "Какое длинное слово вы произносите с удовольствием?",
+  "Какое слово невозможно объяснить жестами?",
+  "Что было в детстве у каждого?",
+  "Что стояло у бабушки на самом видном месте?",
+  "Во что вы играли, когда интернет ещё выключали?",
+  "Какую вещь из детства вы бы сейчас не узнали?",
+  "Для чего вы уже слишком взрослый?",
+  "Чему вы так и не научились?",
+  "Что вы гуглили последним?",
+  "Что вы делаете лучше всех, но это никому не нужно?",
+  "В чём вы уверены, но проверять не станете?",
+  "Что вы откладываете уже третий год?",
+  "От какого слова вы улыбаетесь?",
+  "Что обрадовало вас за последние сутки?",
+  "Что успокаивает вас быстрее всего?",
+  "Что вы бы забрали из горящего дома?"
+];
+
 var MIN_PLAYERS = 3;
 var STORE = "shlyapa.mvp.v9";
 
@@ -678,7 +746,7 @@ var TELEGRAM_URL = "https://t.me/gentlemad";
    docs/CHANGELOG.md. Отметку сборки к нему приклеивает build.js: по версии
    понятно, что человек видел, по дате - какая именно сборка у него открыта. */
 var VERSION = "0.5";
-var BUILD = "0.5 · 2026-09-19 16:15 UTC";
+var BUILD = "0.5 · 2026-09-20 09:06 UTC";
 var FB_STORE = "shlyapa.fb.v1";
 var FB_MIN = 5, FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
 /* Счётчик символов висит на экране без дела: показываем, только когда
@@ -1617,6 +1685,29 @@ function nextUnfinished(from){
   for(var k=1;k<=n;k++){ var i=(from+k)%n; if(!entryDone(S.players[i].id)) return i; }
   return -1;
 }
+/* Колода вопросов: тасуется и раздаётся по одному, поэтому один и тот же
+   вопрос не попадётся дважды, пока не покажутся все. Экран ввода
+   перерисовывается на каждое добавленное слово, поэтому текущий вопрос
+   живёт снаружи разметки, а таймер не перезапускается при перерисовке. */
+var hintDeck=[], hintNow="", hintTimer=null;
+
+function nextHint(){
+  if(!hintDeck.length) hintDeck = shuffle(HINTS);
+  hintNow = hintDeck.shift();
+  return hintNow;
+}
+function paintHint(){
+  var el = byId("hintq");
+  if(!el){ stopHints(); return; }     // ушли с экрана ввода
+  el.textContent = nextHint();
+  if(!reduced()){ el.classList.remove("swap"); void el.offsetWidth; el.classList.add("swap"); }
+}
+function startHints(){
+  if(hintTimer) return;               // перерисовка не сбрасывает отсчёт
+  hintTimer = setInterval(paintHint, 7000);
+}
+function stopHints(){ clearInterval(hintTimer); hintTimer = null; }
+
 function renderEntry(){
   var el=byId("s-entry"), p=S.players[S.entryIndex];
   if(!p){ S.phase="setup"; go(); return; }
@@ -1625,6 +1716,9 @@ function renderEntry(){
   el.innerHTML =
     '<div class="pad">'+
       '<h1>'+esc(p.name)+' придумывает '+num(need,"слово","слова","слов")+'</h1>'+
+      '<button class="hintbox" id="hintbox" aria-label="Другая подсказка">'+
+        '<span class="hl">Подсказка:</span>'+
+        '<span class="hq" id="hintq">'+esc(hintNow || nextHint())+'</span></button>'+
       '<div><div class="tfrow">'+
         '<input class="tf" type="text" id="wordin" placeholder="Слово" maxlength="24" autocomplete="off" autocorrect="off" spellcheck="false"'+(done?" disabled":"")+'>'+
         '<button class="addbtn" id="addw"'+(done?" disabled":"")+'>Добавить</button></div>'+
@@ -1642,6 +1736,10 @@ function renderEntry(){
               (nxt>=0 ? "Подтвердить и передать: "+esc(S.players[nxt].name) : "Все уже ввели")+'</ion-button>')+
       '</div>'+
     '</div>';
+
+  var hb=byId("hintbox");
+  if(hb) hb.onclick=paintHint;        // тап выдаёт следующий вопрос сразу
+  startHints();
 
   var inp=byId("wordin"), msg=byId("wmsg"), b;
   if(!done){
@@ -2653,6 +2751,7 @@ function go(){
   byId("app").classList.toggle("playing", playing);
   byId("dots").hidden = !(playing || S.phase === "home");
   if(S.phase !== "home"){ clearInterval(hatTimer); hatTimer = null; }
+  if(S.phase !== "entry") stopHints();
 
   renderBar(); renderCtx(); renderProgress(); renderDev(); save();
   requestAnimationFrame(syncSticky);
