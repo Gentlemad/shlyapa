@@ -193,25 +193,37 @@
     0%,100%{box-shadow:inset 0 0 0 1px rgba(31,111,235,.10), 0 0 0 0 rgba(31,111,235,0)}
     50%{box-shadow:inset 0 0 0 1px rgba(31,111,235,.26), 0 0 17px 1px rgba(31,111,235,.20)}}
   /* в момент подмены вопроса свечение коротко вспыхивает ярче */
-  .hintbox.pulse{animation:hintPulse .85s ease-out}
+  .hintbox.lit{animation:hintPulse .85s ease-out}
   @keyframes hintPulse{
     0%{box-shadow:inset 0 0 0 1px rgba(31,111,235,.10), 0 0 0 0 rgba(31,111,235,0)}
     30%{box-shadow:inset 0 0 0 1px rgba(31,111,235,.45), 0 0 26px 4px rgba(31,111,235,.34)}
     100%{box-shadow:inset 0 0 0 1px rgba(31,111,235,.10), 0 0 0 0 rgba(31,111,235,0)}}
   .hintbox:active{transform:scale(.995)}
 
+  /* Имя класса не должно пересекаться с .flash: тот занят оверлеем смены
+     раунда и приносит с собой padding:24px, из-за чего иконка раздувалась,
+     а колба внутри схлопывалась в ноль по высоте. */
   .hintbox .hl{flex:none;width:23px;height:23px;color:var(--accent);
-    animation:bulbBreathe 3.6s ease-in-out infinite}
+    transform-origin:50% 80%;
+    animation:bulbSway 3.2s ease-in-out infinite}
   .hintbox .hl svg{width:23px;height:23px}
-  @keyframes bulbBreathe{0%,100%{opacity:.9;transform:scale(1)}
-    50%{opacity:1;transform:scale(1.08)}}
-  /* лампочка вспыхивает ровно в момент подмены вопроса */
-  .hintbox .hl.flash{animation:bulbFlash .62s ease-out}
-  @keyframes bulbFlash{0%{transform:scale(1)}
-    28%{transform:scale(1.32);filter:drop-shadow(0 0 7px rgba(31,111,235,.75))}
-    100%{transform:scale(1);filter:none}}
+  /* покачивание из стороны в сторону, как у подвешенной лампочки */
+  @keyframes bulbSway{
+    0%,100%{transform:rotate(-8deg)}
+    50%{transform:rotate(8deg)}}
+  /* в момент подмены вопроса лампочка вспыхивает и качается сильнее */
+  .hintbox .hl.blink{animation:bulbBlink .7s cubic-bezier(.3,1.4,.5,1)}
+  @keyframes bulbBlink{
+    0%{transform:rotate(0) scale(1)}
+    25%{transform:rotate(-17deg) scale(1.22);filter:drop-shadow(0 0 8px rgba(31,111,235,.8))}
+    60%{transform:rotate(13deg) scale(1.1)}
+    100%{transform:rotate(-8deg) scale(1);filter:none}}
 
-  .hintbox .hq{flex:1;min-width:0;transition:opacity .26s ease, transform .26s ease, filter .26s ease}
+  /* Место под две строки держится всегда: все пятьдесят вопросов на телефоне
+     укладываются в две, а без резерва блок дёргался по высоте при каждой
+     смене. min-height, а не height: на совсем узком экране текст не обрежется. */
+  .hintbox .hq{flex:1;min-width:0;min-height:2.8em;display:flex;align-items:center;
+    transition:opacity .26s ease, transform .26s ease, filter .26s ease}
   .hintbox .hq.out{opacity:0;transform:translateY(-9px);filter:blur(2px)}
   .hintbox .hq.in{animation:hintIn .5s cubic-bezier(.16,.9,.3,1)}
   @keyframes hintIn{from{opacity:0;transform:translateY(12px);filter:blur(3px)}
@@ -638,7 +650,7 @@
     .plusone,.streak,.winner .cup,.fmt b.pop,.hero,.lastgame,.homebtns,
     .dotlayer,.screen.enter,.overlay,.mood,.radarpoly,
     .dphone,.dword,.dcard,.dplus,.dmode,.dscore,.toast,
-    .hintbox,.hintbox.pulse,.hintbox .hl,.hintbox .hl.flash,.hintbox .hq.in{animation:none}
+    .hintbox,.hintbox.lit,.hintbox .hl,.hintbox .hl.blink,.hintbox .hq.in{animation:none}
     .hintbox .hq{transition:none}
     /* без анимации фреймы показывают конечное состояние, а не пустоту */
     .dword,.dplus,.dscore{opacity:1}
@@ -783,7 +795,7 @@ var TELEGRAM_URL = "https://t.me/gentlemad";
    docs/CHANGELOG.md. Отметку сборки к нему приклеивает build.js: по версии
    понятно, что человек видел, по дате - какая именно сборка у него открыта. */
 var VERSION = "0.5";
-var BUILD = "0.5 · 2026-09-20 09:42 UTC";
+var BUILD = "0.5 · 2026-09-20 09:51 UTC";
 var FB_STORE = "shlyapa.fb.v1";
 var FB_MIN = 5, FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
 /* Счётчик символов висит на экране без дела: показываем, только когда
@@ -1761,9 +1773,17 @@ function paintHint(){
     e.classList.remove("out");
     void e.offsetWidth;
     e.classList.add("in");
-    if(bulb){ bulb.classList.remove("flash"); void bulb.offsetWidth; bulb.classList.add("flash"); }
+    /* Разовый класс перекрывает бесконечную анимацию, поэтому его надо снять:
+       иначе покачивание и свечение замирают навсегда после первой же смены. */
     var box = byId("hintbox");
-    if(box){ box.classList.remove("pulse"); void box.offsetWidth; box.classList.add("pulse"); }
+    [[bulb, "blink", 700], [box, "lit", 850]].forEach(function(pair){
+      var el = pair[0];
+      if(!el) return;
+      el.classList.remove(pair[1]);
+      void el.offsetWidth;
+      el.classList.add(pair[1]);
+      setTimeout(function(){ el.classList.remove(pair[1]); }, pair[2]);
+    });
     setTimeout(function(){ hintBusy = false; }, 500);
   }, 270);
 }
