@@ -1,15 +1,35 @@
 /*
-  Ретранслятор отзывов: страница -> Cloudflare Worker -> телеграм.
+  Приёмник обратной связи и событий: страница -> Cloudflare Worker -> дальше.
 
-  Зачем нужен посредник: токен бота нельзя класть в страницу. Страница на
-  GitHub Pages открыта всем, и вместе с ней открыт был бы токен, а с токеном
-  любой прочитает переписку бота через getUpdates и начнёт слать тебе спам.
-  Воркер держит токен у себя и наружу отдаёт только "принято".
+  Два маршрута, потому что у них разные адресаты и разный объём:
+    POST /      отзыв человека -> телеграм. Их единицы, их читают глазами.
+    POST /e     события приложения -> база D1. Их тысячи, их читают запросом.
+
+  Зачем нужен посредник для отзывов: токен бота нельзя класть в страницу.
+  Страница на GitHub Pages открыта всем, и вместе с ней открыт был бы токен,
+  а с токеном любой прочитает переписку бота через getUpdates и начнёт слать
+  тебе спам. Воркер держит токен у себя и наружу отдаёт только "принято".
 
   Переменные окружения (Settings -> Variables, все как Secret):
     BOT_TOKEN       токен от @BotFather
     CHAT_ID         куда слать; свой id можно узнать у @userinfobot
     ALLOWED_ORIGIN  https://gentlemad.github.io  (необязательно, но лучше задать)
+
+  Привязка базы (Settings -> Bindings -> D1 database):
+    DB              база shlyapa-analytics
+
+  Необязательные переменные для копии событий в PostHog:
+    POSTHOG_KEY     project API key из настроек проекта PostHog
+    POSTHOG_HOST    https://eu.i.posthog.com (по умолчанию он же)
+
+  Пересылает события воркер, а не страница. Так задумано: телефон говорит
+  только с нами, и если у игрока PostHog недоступен, его события всё равно
+  долетят - пересылка идёт с нашей стороны. Плюс в страницу не добавляется
+  ни одного лишнего скрипта.
+
+  Без привязки DB маршрут /e честно отвечает ошибкой, а отзывы продолжают
+  работать: одно не должно ронять другое. Без POSTHOG_KEY копия просто не
+  отправляется, на базу это не влияет.
 
   Разворачивание описано в worker/README.md
 */
@@ -18,8 +38,15 @@ const MAX_TEXT = 2000;
 const MAX_CONTACT = 120;
 const MAX_BODY = 8 * 1024;
 
+// Событий в одной пачке и вес всей пачки. Страница шлёт по 120 штук,
+// запас нужен на случай, когда буфер догоняет после долгого офлайна.
+const MAX_EVENTS = 250;
+const MAX_EVENTS_BODY = 256 * 1024;
+const MAX_NAME = 40;
+const MAX_PROPS = 4 * 1024;
+
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, execCtx) {
     const origin = env.ALLOWED_ORIGIN || "*";
     const cors = {
       "access-control-allow-origin": origin,
@@ -36,6 +63,9 @@ export default {
       const from = request.headers.get("origin");
       if (from && from !== env.ALLOWED_ORIGIN) return json({ error: "forbidden" }, 403, cors);
     }
+
+    const path = new URL(request.url).pathname.replace(/\/+$/, "");
+    if (path === "/e") return events(request, env, cors, execCtx);
 
     let body;
     try {
@@ -98,6 +128,104 @@ export default {
     return json({ ok: true }, 200, cors);
   }
 };
+
+/* ---------- события ----------
+   Пишем как есть, без разбора: смысл событий живёт в запросах к базе, а не
+   здесь. Задача воркера - не пустить внутрь мусор и не дать засыпать базу
+   одной вкладкой. Поэтому режем по числу, размеру и длине полей. */
+async function events(request, env, cors, execCtx) {
+  if (!env.DB) return json({ error: "no database" }, 500, cors);
+
+  let body;
+  try {
+    const raw = await request.text();
+    if (raw.length > MAX_EVENTS_BODY) return json({ error: "too large" }, 413, cors);
+    body = JSON.parse(raw);
+  } catch (e) {
+    return json({ error: "bad json" }, 400, cors);
+  }
+
+  const install = String(body.install || "").trim().slice(0, 64);
+  if (!install) return json({ error: "no install" }, 400, cors);
+
+  const list = Array.isArray(body.events) ? body.events.slice(0, MAX_EVENTS) : [];
+  if (!list.length) return json({ error: "empty" }, 400, cors);
+
+  const sit = String(body.sit || "").trim().slice(0, 64);
+  const build = String(body.build || "").trim().slice(0, 40);
+  const ua = String(body.ua || "").trim().slice(0, 400);
+  const got = Date.now();
+
+  const stmt = env.DB.prepare(
+    "INSERT INTO events (at, got, install, sit, game, name, props, build, ua) VALUES (?,?,?,?,?,?,?,?,?)"
+  );
+
+  const rows = [];
+  for (const e of list) {
+    if (!e || typeof e !== "object") continue;
+    const name = String(e.n || "").trim().slice(0, MAX_NAME);
+    if (!name) continue;
+    // Время события берём с устройства, но не пускаем в него мусор:
+    // сломанные часы не должны утащить строку на тридцать лет назад
+    let at = Number(e.at);
+    if (!isFinite(at) || at < 1600000000000 || at > got + 86400000) at = got;
+    let props = "{}";
+    try { props = JSON.stringify(e.p || {}).slice(0, MAX_PROPS); } catch (err) {}
+    rows.push(stmt.bind(at, got, install, sit, String(e.g || "").slice(0, 64), name, props, build, ua));
+  }
+  if (!rows.length) return json({ error: "empty" }, 400, cors);
+
+  try {
+    await env.DB.batch(rows);
+  } catch (err) {
+    console.log("d1 failed", String(err));
+    return json({ error: "store failed" }, 502, cors);
+  }
+
+  /* Копия в PostHog отправляется после ответа страницы: база - источник
+     правды, и ждать чужой сервис, чтобы сказать "принято", незачем. */
+  if (env.POSTHOG_KEY) {
+    const job = toPosthog(env, install, sit, build, list);
+    if (execCtx && execCtx.waitUntil) execCtx.waitUntil(job); else await job.catch(() => {});
+  }
+
+  return json({ ok: true, n: rows.length }, 200, cors);
+}
+
+async function toPosthog(env, install, sit, build, list) {
+  const host = (env.POSTHOG_HOST || "https://eu.i.posthog.com").replace(/\/+$/, "");
+  const batch = [];
+  for (const e of list) {
+    if (!e || typeof e !== "object") continue;
+    const name = String(e.n || "").trim().slice(0, MAX_NAME);
+    if (!name) continue;
+    const props = (e.p && typeof e.p === "object") ? e.p : {};
+    batch.push({
+      event: name,
+      distinct_id: install,
+      properties: Object.assign({}, props, {
+        distinct_id: install,
+        sit: sit,
+        game: String(e.g || ""),
+        build: build
+      }),
+      timestamp: new Date(Number(e.at) || Date.now()).toISOString()
+    });
+  }
+  if (!batch.length) return;
+
+  try {
+    const r = await fetch(host + "/batch/", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ api_key: env.POSTHOG_KEY, batch: batch })
+    });
+    // Молча: база уже всё приняла, копия - дело второе
+    if (!r.ok) console.log("posthog failed", r.status, (await r.text()).slice(0, 300));
+  } catch (err) {
+    console.log("posthog error", String(err));
+  }
+}
 
 function describeGame(ctx) {
   if (!ctx.players) return "не начата";
