@@ -172,10 +172,10 @@
      Высота фиксирована снизу, иначе вопросы разной длины дёргают вёрстку. */
   /* Содержимое по центру: короткий вопрос в одну строку иначе болтается
      сверху, и блок выглядит наполовину пустым. */
-  .hintbox{position:relative;display:flex;gap:11px;align-items:center;
-    width:100%;min-height:64px;text-align:left;border:0;cursor:pointer;
-    background:var(--accent-soft);border-radius:14px;padding:13px 15px;
-    font-size:13.5px;line-height:1.45;color:var(--ink);
+  .hintbox{position:relative;display:flex;gap:10px;align-items:center;
+    width:100%;min-height:50px;text-align:left;border:0;cursor:pointer;
+    background:var(--accent-soft);border-radius:13px;padding:9px 13px;
+    font-size:13.5px;line-height:1.4;color:var(--ink);
     animation:hintGlow 5s ease-in-out infinite}
   /* Мягкое свечение по контуру вместо бегущей полосы: та читалась как
      скелетон загрузки, будто вопросы ещё подгружаются. */
@@ -615,7 +615,11 @@
   body.appmode{--sbh:0px}
   body.appmode .rail{display:none}
   body.appmode .stage{padding:0}
-  body.appmode .phone{width:100%;height:100%;max-height:none;border-radius:0;padding:0;box-shadow:none}
+  /* На телефоне это вся ширина, на широком экране - колонка по центру.
+     Без ограничения приложение растягивалось на всю ширину окна: строки
+     уезжали к краям, иконки терялись, читать было нечем. */
+  body.appmode .phone{width:min(480px,100%);height:100%;max-height:none;
+    border-radius:0;padding:0;box-shadow:none}
   body.appmode .screenarea{border-radius:0}
   body.appmode .island,body.appmode .statusbar,body.appmode .homebar{display:none}
 
@@ -1728,7 +1732,7 @@ function nextUnfinished(from){
    перерисовывается на каждое добавленное слово, поэтому текущий вопрос
    живёт снаружи разметки, а таймер не перезапускается при перерисовке. */
 var hintDeck=[], hintNow="", hintTimer=null, hintBusy=false;
-var HINT_EVERY = 10000;               // вопрос держится на экране, а не мелькает
+var HINT_EVERY = 7000;
 
 function nextHint(){
   if(!hintDeck.length) hintDeck = shuffle(HINTS);
