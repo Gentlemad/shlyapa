@@ -341,8 +341,7 @@
   .consent .cyes:active{background:#1b61ce}
   .consent .cno{background:transparent;color:var(--accent)}
   .consent .cno:active{background:var(--accent-soft)}
-  .consent .clink{display:block;margin-top:9px;text-align:center;
-    font-size:12.5px;color:var(--muted);text-decoration:underline}
+
   /* Пока баннер висит, экран поджимается на его высоту: иначе он ложится
      поверх нижних кнопок, а на главной это кнопка "Создать игру".
      Высоту меряем в JS и кладём в --conh: текст переносится по-разному. */
@@ -350,12 +349,6 @@
   .consenting .actions.stuck{bottom:var(--conh,152px)}
   @keyframes consentIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
   @media (prefers-reduced-motion:reduce){ .consent .cbox{animation:none} }
-  /* переключатель отправки статистики под инструкцией */
-  .anrow{display:flex;align-items:center;gap:10px;padding:13px 2px 2px;
-    border-top:1px solid var(--line);margin-top:14px;font-size:13.5px;color:var(--muted)}
-  .anrow .ant{flex:1;min-width:0}
-  .anrow button{flex:none;border:0;background:none;padding:6px 0;color:var(--accent);
-    font-size:13.5px;font-weight:600;cursor:pointer}
   .fbstatus{font-size:13px;min-height:18px}
   .fbstatus.bad{color:var(--danger)}
   .fbstatus.ok{color:var(--ok)}
@@ -727,7 +720,7 @@ var STORE = "shlyapa.mvp.v9";
    ============================================================ */
 var FEEDBACK_URL = "https://shlyapa-feedback.grudanovartyom.workers.dev";
 var TELEGRAM_URL = "https://t.me/gentlemad";
-var BUILD = "2026-09-20 09:24 UTC";                 /* сюда build.js подставляет отметку сборки */
+var BUILD = "2026-09-20 09:47 UTC";                 /* сюда build.js подставляет отметку сборки */
 var FB_STORE = "shlyapa.fb.v1";
 var FB_MIN = 5, FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
 /* Счётчик символов висит на экране без дела: показываем, только когда
@@ -1491,24 +1484,10 @@ function renderRules(){
     '</div>';
   }).join("");
 
-  /* Передумать про статистику можно здесь: другого спокойного места в
-     приложении нет, а прятать переключатель совсем - нечестно. */
-  var anBlock = (EVENTS_URL || METRIKA_ID)
-    ? '<div class="anrow"><span class="ant">Отправка статистики: ' +
-        (anOn() ? "включена" : "выключена") + '</span>' +
-        '<button id="an-toggle">' + (anOn() ? "Выключить" : "Включить") + '</button></div>'
-    : "";
-
   el.innerHTML =
     '<div class="tabwrap">' + segHTML("rules-tabs", ["Как играть", "Вопросы"],
       isFaq ? "Вопросы" : "Как играть") + '</div>' +
-    '<div class="pad' + (isFaq ? " faq" : "") + '" style="gap:0">' + rows + anBlock + '</div>';
-
-  var anT = byId("an-toggle");
-  if(anT) anT.onclick = function(){
-    if(anOn()){ anRevoke(); renderRules(); }
-    else { anPatch({ok:true}); AN.ok = true; anStart(false, null); renderRules(); }
-  };
+    '<div class="pad' + (isFaq ? " faq" : "") + '" style="gap:0">' + rows + '</div>';
 
   bindSeg("rules-tabs", function(v){
     var t = (v === "Вопросы") ? "faq" : "how";
@@ -2189,17 +2168,21 @@ function anAsk(){
      кто обрабатывает, ссылка на политику, два равнозначных действия.
      Категорий здесь одна - аналитика, поэтому кнопки "Настроить" нет:
      настраивать в ней было бы нечего. */
+  /* Ссылка вшита в саму фразу, а не висит отдельной строкой: так она
+     читается как часть объяснения, а не как мелкий шрифт под кнопками. */
+  var about = PRIVACY_URL
+    ? 'Подробнее в <a href="'+PRIVACY_URL+'" target="_blank" rel="noopener">'+
+      'политике обработки данных</a>'
+    : "";
   inner.innerHTML =
     '<div class="cbox">'+
-      '<div class="ct">Мы используем cookie</div>'+
-      '<p class="cp">И собираем статистику о том, как проходит игра, чтобы её '+
-        'дорабатывать. Состав данных и порядок удаления - в политике.</p>'+
+      '<div class="ct">Игра использует cookie</div>'+
+      '<p class="cp">Мы собираем статистику о том, как проходят партии, чтобы '+
+        'делать игру удобнее и интереснее. '+ about +'</p>'+
       '<div class="cbtns">'+
         '<button class="cbtn cyes" id="cons-yes">Принять</button>'+
         '<button class="cbtn cno" id="cons-no">Отклонить</button>'+
       '</div>'+
-      (PRIVACY_URL ? '<a class="clink" href="'+PRIVACY_URL+'" target="_blank" '+
-        'rel="noopener">Политика обработки данных</a>' : '')+
     '</div>';
   byId("cons-yes").onclick = function(){ anAnswer(true); };
   byId("cons-no").onclick = function(){ anAnswer(false); };
@@ -2248,7 +2231,9 @@ function anAnswer(ok){
   }
   if(AN._after){ var f = AN._after; AN._after = null; f(); }
 }
-/* Передумать можно на экране инструкции */
+/* Отзыв согласия. Пока не вызывается ниоткуда: переключатель переедет в
+   раздел настроек, когда он появится. До тех пор отозвать можно очисткой
+   данных сайта - вопрос тогда задаётся заново. Так написано и в политике. */
 function anRevoke(){
   anPatch({ok:false, q:[], open:null});
   AN.ok = false; AN.q = [];
