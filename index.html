@@ -193,10 +193,10 @@
     0%,100%{box-shadow:inset 0 0 0 1px rgba(31,111,235,.10), 0 0 0 0 rgba(31,111,235,0)}
     50%{box-shadow:inset 0 0 0 1px rgba(31,111,235,.26), 0 0 17px 1px rgba(31,111,235,.20)}}
   /* в момент подмены вопроса свечение коротко вспыхивает ярче */
-  .hintbox.lit{animation:hintPulse .85s ease-out}
+  .hintbox.lit{animation:hintPulse 1.15s ease-in-out}
   @keyframes hintPulse{
     0%{box-shadow:inset 0 0 0 1px rgba(31,111,235,.10), 0 0 0 0 rgba(31,111,235,0)}
-    30%{box-shadow:inset 0 0 0 1px rgba(31,111,235,.45), 0 0 26px 4px rgba(31,111,235,.34)}
+    42%{box-shadow:inset 0 0 0 1px rgba(31,111,235,.32), 0 0 20px 2px rgba(31,111,235,.24)}
     100%{box-shadow:inset 0 0 0 1px rgba(31,111,235,.10), 0 0 0 0 rgba(31,111,235,0)}}
   .hintbox:active{transform:scale(.995)}
 
@@ -209,15 +209,17 @@
   .hintbox .hl svg{width:23px;height:23px}
   /* покачивание из стороны в сторону, как у подвешенной лампочки */
   @keyframes bulbSway{
-    0%,100%{transform:rotate(-8deg)}
-    50%{transform:rotate(8deg)}}
-  /* в момент подмены вопроса лампочка вспыхивает и качается сильнее */
-  .hintbox .hl.blink{animation:bulbBlink .7s cubic-bezier(.3,1.4,.5,1)}
-  @keyframes bulbBlink{
-    0%{transform:rotate(0) scale(1)}
-    25%{transform:rotate(-17deg) scale(1.22);filter:drop-shadow(0 0 8px rgba(31,111,235,.8))}
-    60%{transform:rotate(13deg) scale(1.1)}
-    100%{transform:rotate(-8deg) scale(1);filter:none}}
+    0%,100%{transform:rotate(-7deg)}
+    50%{transform:rotate(7deg)}}
+  /* В момент подмены вопроса лампочка мягко теплеет и возвращается к синему.
+     Анимации перечислены через запятую, поэтому покачивание не прерывается,
+     а моргание трогает только цвет - ни рывка, ни скачка размера. */
+  .hintbox .hl.blink{animation:bulbSway 3.2s ease-in-out infinite,
+                               bulbLight 1.15s ease-in-out}
+  @keyframes bulbLight{
+    0%{color:var(--accent)}
+    38%{color:var(--gold)}
+    100%{color:var(--accent)}}
 
   /* Место под две строки держится всегда: все пятьдесят вопросов на телефоне
      укладываются в две, а без резерва блок дёргался по высоте при каждой
@@ -795,7 +797,7 @@ var TELEGRAM_URL = "https://t.me/gentlemad";
    docs/CHANGELOG.md. Отметку сборки к нему приклеивает build.js: по версии
    понятно, что человек видел, по дате - какая именно сборка у него открыта. */
 var VERSION = "0.5";
-var BUILD = "0.5 · 2026-09-20 09:51 UTC";
+var BUILD = "0.5 · 2026-09-20 09:55 UTC";
 var FB_STORE = "shlyapa.fb.v1";
 var FB_MIN = 5, FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
 /* Счётчик символов висит на экране без дела: показываем, только когда
@@ -1776,7 +1778,7 @@ function paintHint(){
     /* Разовый класс перекрывает бесконечную анимацию, поэтому его надо снять:
        иначе покачивание и свечение замирают навсегда после первой же смены. */
     var box = byId("hintbox");
-    [[bulb, "blink", 700], [box, "lit", 850]].forEach(function(pair){
+    [[bulb, "blink", 1200], [box, "lit", 1200]].forEach(function(pair){
       var el = pair[0];
       if(!el) return;
       el.classList.remove(pair[1]);
