@@ -76,10 +76,13 @@ function build(){
     console.warn("Предупреждение: блок клавиатуры не найден, проверьте разметку");
   }
 
-  // Отметка сборки едет в отзывы: по ней видно, на какой версии словили баг
+  // Отметка сборки едет в отзывы: по ней видно, что за версия и какая сборка
+  const version = (src.match(/var VERSION = "([^"]*)"/) || [])[1];
+  if(!version) console.warn("Предупреждение: не найдено объявление VERSION");
   const stamp = new Date().toISOString().slice(0,16).replace("T", " ") + " UTC";
+  const label = (version ? version + " · " : "") + stamp;
   const beforeStamp = body.length;
-  body = body.replace('var BUILD = "dev";', 'var BUILD = ' + JSON.stringify(stamp) + ';');
+  body = body.replace('var BUILD = "dev";', 'var BUILD = ' + JSON.stringify(label) + ';');
   if(body.length === beforeStamp){
     console.warn("Предупреждение: отметка сборки не подставлена, проверьте объявление BUILD");
   }
