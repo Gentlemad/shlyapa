@@ -170,23 +170,31 @@
   /* Подсказка. Смена вопроса должна быть заметна боковым зрением, поэтому
      она идёт в два такта - уход и приход, - а не мгновенной подменой текста.
      Высота фиксирована снизу, иначе вопросы разной длины дёргают вёрстку. */
-  .hintbox{position:relative;overflow:hidden;display:flex;gap:10px;align-items:flex-start;
-    width:100%;min-height:62px;text-align:left;border:0;cursor:pointer;
+  /* Содержимое по центру: короткий вопрос в одну строку иначе болтается
+     сверху, и блок выглядит наполовину пустым. */
+  .hintbox{position:relative;display:flex;gap:11px;align-items:center;
+    width:100%;min-height:64px;text-align:left;border:0;cursor:pointer;
     background:var(--accent-soft);border-radius:14px;padding:13px 15px;
     font-size:13.5px;line-height:1.45;color:var(--ink);
-    box-shadow:inset 0 0 0 1px rgba(31,111,235,.12)}
-  /* медленный блик по контейнеру: немного жизни без мельтешения */
-  .hintbox:after{content:"";position:absolute;top:0;bottom:0;width:45%;left:-60%;
-    background:linear-gradient(100deg,rgba(255,255,255,0),rgba(255,255,255,.55),rgba(255,255,255,0));
-    animation:hintSheen 7s ease-in-out infinite;pointer-events:none}
-  @keyframes hintSheen{0%,62%{left:-60%}88%,100%{left:120%}}
+    animation:hintGlow 5s ease-in-out infinite}
+  /* Мягкое свечение по контуру вместо бегущей полосы: та читалась как
+     скелетон загрузки, будто вопросы ещё подгружаются. */
+  @keyframes hintGlow{
+    0%,100%{box-shadow:inset 0 0 0 1px rgba(31,111,235,.10), 0 0 0 0 rgba(31,111,235,0)}
+    50%{box-shadow:inset 0 0 0 1px rgba(31,111,235,.26), 0 0 17px 1px rgba(31,111,235,.20)}}
+  /* в момент подмены вопроса свечение коротко вспыхивает ярче */
+  .hintbox.pulse{animation:hintPulse .85s ease-out}
+  @keyframes hintPulse{
+    0%{box-shadow:inset 0 0 0 1px rgba(31,111,235,.10), 0 0 0 0 rgba(31,111,235,0)}
+    30%{box-shadow:inset 0 0 0 1px rgba(31,111,235,.45), 0 0 26px 4px rgba(31,111,235,.34)}
+    100%{box-shadow:inset 0 0 0 1px rgba(31,111,235,.10), 0 0 0 0 rgba(31,111,235,0)}}
   .hintbox:active{transform:scale(.995)}
 
-  .hintbox .hl{flex:none;width:19px;height:19px;color:var(--accent);margin-top:1px;
+  .hintbox .hl{flex:none;width:23px;height:23px;color:var(--accent);
     animation:bulbBreathe 3.6s ease-in-out infinite}
-  .hintbox .hl svg{width:19px;height:19px}
-  @keyframes bulbBreathe{0%,100%{opacity:.75;transform:scale(1)}
-    50%{opacity:1;transform:scale(1.09)}}
+  .hintbox .hl svg{width:23px;height:23px}
+  @keyframes bulbBreathe{0%,100%{opacity:.9;transform:scale(1)}
+    50%{opacity:1;transform:scale(1.08)}}
   /* лампочка вспыхивает ровно в момент подмены вопроса */
   .hintbox .hl.flash{animation:bulbFlash .62s ease-out}
   @keyframes bulbFlash{0%{transform:scale(1)}
@@ -616,7 +624,7 @@
     .plusone,.streak,.winner .cup,.fmt b.pop,.hero,.lastgame,.homebtns,
     .dotlayer,.screen.enter,.overlay,.mood,.radarpoly,
     .dphone,.dword,.dcard,.dplus,.dmode,.dscore,.toast,
-    .hintbox:after,.hintbox .hl,.hintbox .hl.flash,.hintbox .hq.in{animation:none}
+    .hintbox,.hintbox.pulse,.hintbox .hl,.hintbox .hl.flash,.hintbox .hq.in{animation:none}
     .hintbox .hq{transition:none}
     /* без анимации фреймы показывают конечное состояние, а не пустоту */
     .dword,.dplus,.dscore{opacity:1}
@@ -708,14 +716,14 @@ var HINTS = [
   "Что вы ищете дольше всего, хотя оно всегда рядом?",
   "Без чего вы не выходите из дома?",
   "Что лежит у вас в кармане прямо сейчас?",
-  "Что вы обещали починить ещё весной?",
+  "Что вы обещали исправить ещё полгода назад?",
   "Что лежит без дела, но выбросить жалко?",
-  "Какая вещь переезжает с вами уже много лет?",
+  "Какая вещь всегда с вами уже много лет?",
   "Что вы теряете чаще всего?",
   "Что вы точно забудете взять в поездку?",
   "Чего в вашем доме подозрительно много?",
-  "Что вы никому не одолжите?",
-  "Что у вас сломалось последним?",
+  "Что вы никому не доверите, кроме себя?",
+  "Что вас выбесило в последнее время?",
   "Что вы прячете, когда приходят гости?",
   "Что вам подарили, а вы так и не поняли зачем?",
   "Что бы вы съели прямо сейчас?",
@@ -724,7 +732,7 @@ var HINTS = [
   "Какой продукт вы больше никогда не купите?",
   "Что вы кладёте в холодильник и забываете там навсегда?",
   "Что вас искренне бесит?",
-  "Какой звук вы узнаете из тысячи и ненавидите?",
+  "Звук чего вы узнаете из тысячи?",
   "Что портит вам утро быстрее всего?",
   "Какое слово вы слышите на работе слишком часто?",
   "Что вы обходите стороной?",
@@ -736,23 +744,23 @@ var HINTS = [
   "Какое слово вы выдумали сами?",
   "Какое слово стоило бы запретить?",
   "Какое слово звучит красивее, чем то, что оно значит?",
-  "Какое слово вы говорите чаще, чем думаете?",
+  "О чём вы часто думаете, но не говорите?",
   "Какое длинное слово вы произносите с удовольствием?",
   "Какое слово невозможно объяснить жестами?",
-  "Что было в детстве у каждого?",
-  "Что стояло у бабушки на самом видном месте?",
-  "Во что вы играли, когда интернет ещё выключали?",
-  "Какую вещь из детства вы бы сейчас не узнали?",
+  "Чего уже нет у современных детей?",
+  "Что у вас ассоциируется с бабушкой или дедушкой?",
+  "Чем лучше всего заняться, когда нет интернета?",
+  "Что у вас вызывает чувство ностальгии?",
   "Для чего вы уже слишком взрослый?",
   "Чему вы так и не научились?",
   "Что вы гуглили последним?",
   "Что вы делаете лучше всех, но это никому не нужно?",
   "В чём вы уверены, но проверять не станете?",
-  "Что вы откладываете уже третий год?",
+  "Что вы откладываете уже несколько лет?",
   "От какого слова вы улыбаетесь?",
-  "Что обрадовало вас за последние сутки?",
+  "Что обрадовало вас за последний день?",
   "Что успокаивает вас быстрее всего?",
-  "Что вы бы забрали из горящего дома?"
+  "Что вы бы забрали из горящего дома в первую очередь?"
 ];
 
 var MIN_PLAYERS = 3;
@@ -833,8 +841,12 @@ var IC = {
   /* Мегафон: обводка, как у остальных значков интерфейса */
   /* стрелка уходит вправо: коробка со стрелкой вверх читается как выгрузка */
   share: sv('<path d="M4.5 19.5c.4-5.8 4.2-8.7 8.5-8.9V5.5L20 12l-7 6.5V14c-4.2 0-6.9 1.7-8.5 5.5z"/>', 1.9),
-  bulb:  sv('<path d="M9.2 17.5h5.6"/><path d="M10 20.5h4"/>'+
-            '<path d="M12 3.5a5.6 5.6 0 0 0-3.3 10.1c.6.5 1 1.2 1 2h4.6c0-.8.4-1.5 1-2A5.6 5.6 0 0 0 12 3.5z"/>', 1.8),
+  /* Колба с заливкой: тонкая обводка на 20 пикселях читается как закорючка */
+  bulb:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '+
+         'stroke-linecap="round" stroke-linejoin="round">'+
+         '<path d="M12 2.6a6.4 6.4 0 0 0-3.7 11.6c.7.5 1.1 1.2 1.1 2v.3h5.2v-.3c0-.8.4-1.5 1.1-2A6.4 6.4 0 0 0 12 2.6z" '+
+         'fill="currentColor" fill-opacity=".22"/>'+
+         '<path d="M9.6 19h4.8"/><path d="M10.5 21.6h3"/></svg>',
   horn:  sv('<path d="M4 9.5v5a1.5 1.5 0 0 0 1.5 1.5H8l9 4.5V5L8 9.5H5.5A1.5 1.5 0 0 0 4 11z"/>'+
             '<path d="M7.5 16v3.2a1.3 1.3 0 0 0 1.3 1.3h1.2"/>'+
             '<path d="M20 9.8a3.4 3.4 0 0 1 0 4.4"/>')
@@ -1745,6 +1757,8 @@ function paintHint(){
     void e.offsetWidth;
     e.classList.add("in");
     if(bulb){ bulb.classList.remove("flash"); void bulb.offsetWidth; bulb.classList.add("flash"); }
+    var box = byId("hintbox");
+    if(box){ box.classList.remove("pulse"); void box.offsetWidth; box.classList.add("pulse"); }
     setTimeout(function(){ hintBusy = false; }, 500);
   }, 270);
 }
