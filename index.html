@@ -311,18 +311,20 @@
      баннером, и он читается как предложение, а не как требование. */
   /* Отступ карточки от краёв задан один раз переменной: на него же опирается
      градиент, и связь "сколько снизу - столько и сверху" держится сама. */
-  .consent{--cgap:11px;position:absolute;left:0;right:0;bottom:0;z-index:25;
-    padding:0 var(--cgap) var(--cgap);pointer-events:none}
+  .consent{--cgap:11px;--cglow:40px;position:absolute;left:0;right:0;bottom:0;
+    z-index:25;padding:0 var(--cgap) var(--cgap);pointer-events:none}
   /* Градиент гасит контент над карточкой и уводит взгляд вниз. Тянется выше
      самой карточки, поэтому лежит в псевдоэлементе, а не в фоне. */
-  /* Подложка баннера: фиолетовый градиент, внизу плотный, вверху прозрачный.
-     Сверху он выходит за карточку ровно на --cgap - столько же, сколько
-     карточка отстоит от низа экрана. Карточка непрозрачна и лежит поверх,
-     поэтому градиент читается ореолом вокруг неё. */
+  /* Подложка баннера: сиреневый ореол, внизу плотный, вверху прозрачный.
+     Тон намеренно бледный: насыщенный фиолетовый на светлом экране кричит и
+     перетягивает внимание с самой карточки. Сверху вылетает за карточку на
+     --cglow, чтобы переход был длинным и мягким. Карточка непрозрачна и
+     лежит поверх, поэтому ореол виден только вокруг неё. */
   .consent:before{content:"";position:absolute;left:0;right:0;bottom:0;
-    top:calc(-1 * var(--cgap));pointer-events:none;
+    top:calc(-1 * var(--cglow));pointer-events:none;
     background:linear-gradient(180deg,
-      rgba(122,90,245,0) 0%, rgba(122,90,245,1) 100%)}
+      rgba(232,227,251,0) 0%, rgba(232,227,251,.45) 46%,
+      rgba(232,227,251,.82) 76%, rgba(232,227,251,1) 100%)}
   .consent .cbox{position:relative;pointer-events:auto;
     background:var(--raise);border:1px solid var(--line);border-radius:16px;
     padding:13px 14px 11px;
@@ -730,7 +732,7 @@ var TELEGRAM_URL = "https://t.me/gentlemad";
    docs/CHANGELOG.md. Отметку сборки к нему приклеивает build.js: по версии
    понятно, что человек видел, по дате - какая именно сборка у него открыта. */
 var VERSION = "0.6";
-var BUILD = "0.6 · 2026-09-21 09:02 UTC";
+var BUILD = "0.6 · 2026-09-21 12:34 UTC";
 var FB_STORE = "shlyapa.fb.v1";
 var FB_MIN = 5, FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
 /* Счётчик символов висит на экране без дела: показываем, только когда
@@ -746,16 +748,18 @@ var FB_FACES = [
 var FB_KINDS = ["Поломка", "Неудобство", "Предложение", "Впечатление"];
 /* Отзыв даёт тот, у кого в руках телефон, а играли все. Одна строка в двух
    местах, чтобы тексты не разъехались. */
-var FB_ASK_OTHERS = "Можно передать телефон остальным игрокам \u2014 их отзыв тоже пригодится.";
+var FB_ASK_OTHERS = "\u2764\uFE0F Вы также можете спросить обратную связь у других игроков, отзывы всей компании важны";
 
 /* ---------- вопрос на финале ----------
    Появляется не с первой партии: после одной игры человеку нечего сравнивать,
    а после третьей он уже знает, где было неудобно. Заодно первые партии
    проходят без лишнего вопроса на экране. */
 var SURVEY_AFTER = 3;
-var SURVEY_Q = "Был момент, когда было непонятно, что происходит?";
-var SURVEY_OPTS = ["Нет", "Да, на смене раунда", "Да, в другом месте"];
-var svAns = "", svText = "", svBusy = false;
+/* Вопрос намеренно нейтральный. Спрашивать "было ли непонятно" - значит
+   просить жалобу: человек с хорошим впечатлением просто промолчит, и выборка
+   перекосится в негатив. Лица дают высказаться и довольным тоже. */
+var SURVEY_Q = "Как вам игра?";
+var svRate = 0, svText = "", svBusy = false;
 var fbRate = 0, fbKind = "", fbReach = false;
 
 /* ============================================================
@@ -1838,25 +1842,23 @@ function surveyOn(){
 }
 function surveyHTML(){
   if(!surveyOn()) return "";
-  var opts = SURVEY_OPTS.map(function(o){
-    return '<button class="chipb" data-sv="'+esc(o)+'" aria-pressed="'+(svAns===o)+'">'+esc(o)+'</button>';
-  }).join("");
-  /* Поле для текста раскрывается только на "да": на "нет" уточнять нечего,
-     и пустое поле на экране выглядело бы как недоделанная работа. */
-  var more = (svAns && svAns !== SURVEY_OPTS[0])
+  /* Те же пять лиц, что и в форме отзыва: один язык оценки во всём продукте */
+  var faces = '<div class="rate" id="sv-rate">' + FB_FACES.map(function(f, i){
+    return '<button class="rateb" data-sv="'+(i+1)+'" aria-pressed="'+(svRate===i+1)+'" '+
+      'aria-label="'+esc(f.label)+'" title="'+esc(f.label)+'">'+f.face+'</button>';
+  }).join("") + '</div>';
+  /* Поле и кнопка появляются только после оценки: до неё на экране финала и
+     так есть на что посмотреть, а пустая форма читалась бы как работа. */
+  var tail = svRate
     ? '<textarea class="tf ta tfwide" id="sv-text" maxlength="'+FB_MAX+'" '+
-        'placeholder="Что именно было непонятно?"></textarea>'
-    : "";
-  var send = svAns
-    ? '<ion-button id="sv-send" expand="block" size="small">Отправить</ion-button>'
+        'placeholder="Поделитесь своими впечатлениями или идеями"></textarea>'+
+      '<div class="fbstatus" id="sv-status"></div>'+
+      '<div class="askothers">'+esc(FB_ASK_OTHERS)+'</div>'+
+      '<ion-button id="sv-send" expand="block">Отправить</ion-button>'
     : "";
   return '<div class="survey">'+
       '<div class="sq">'+esc(SURVEY_Q)+'</div>'+
-      '<div class="chips" id="sv-opts">'+opts+'</div>'+
-      more +
-      '<div class="fbstatus" id="sv-status"></div>'+
-      send +
-      '<div class="askothers">'+esc(FB_ASK_OTHERS)+'</div>'+
+      faces + tail +
     '</div>';
 }
 function surveyThanks(){
@@ -1866,7 +1868,8 @@ function surveyThanks(){
 function bindSurvey(root){
   root.querySelectorAll("[data-sv]").forEach(function(b){
     b.onclick = function(){
-      svAns = (svAns === b.dataset.sv) ? "" : b.dataset.sv;
+      var v = +b.dataset.sv;
+      svRate = (svRate === v) ? 0 : v;
       renderResults();
     };
   });
@@ -1877,13 +1880,19 @@ function bindSurvey(root){
   if(go) go.onclick = surveySend;
 }
 function surveySend(){
-  if(!svAns || svBusy) return;
+  if(!svRate || svBusy) return;
   var note = (byId("sv-text") ? byId("sv-text").value : "").trim().slice(0, FB_MAX);
-  svBusy = true;
   var st = byId("sv-status");
+  /* Короткий обрывок молча не выбрасываем: воркер его всё равно отвергнет,
+     а человек решит, что отправилось. */
+  if(note && note.length < FB_MIN){
+    if(st){ st.className = "fbstatus bad"; st.textContent = "Слишком короткий текст"; }
+    return;
+  }
+  svBusy = true;
   if(st){ st.className = "fbstatus"; st.textContent = "Отправляем..."; }
 
-  track("survey_answered", {a:svAns, comment:!!note, games:fbGames()});
+  track("survey_answered", {rate:svRate, comment:!!note, games:fbGames()});
 
   var ctrl = null, timer = null;
   try{ ctrl = new AbortController(); }catch(e){}
@@ -1892,8 +1901,9 @@ function surveySend(){
   fetch(FEEDBACK_URL, {
     method:"POST", mode:"cors", headers:{"content-type":"application/json"},
     body: JSON.stringify({
-      kind: "Вопрос на финале",
-      text: SURVEY_Q + "\n> " + svAns + (note ? "\n\n" + note : ""),
+      kind: "После партии",
+      rate: svRate,
+      text: note,
       ctx: fbContext()
     }),
     signal: ctrl ? ctrl.signal : undefined
@@ -1901,7 +1911,7 @@ function surveySend(){
     if(!r.ok) throw new Error("HTTP " + r.status);
     if(timer) clearTimeout(timer);
     svBusy = false;
-    S._svSent = true; svAns = ""; svText = "";
+    S._svSent = true; svRate = 0; svText = "";
     buzz(12); save(); renderResults();
   }).catch(function(){
     if(timer) clearTimeout(timer);
@@ -2052,12 +2062,11 @@ function renderFeedback(){
   inner.innerHTML =
     '<div class="hdr"><div class="hside">' + hbtn("fb-close", IC.back, "Назад") + '</div>' +
     '<div class="htitle">Обратная связь</div><div class="hside right"></div></div>' +
-    '<div class="sheetbody"><div class="pad" style="gap:14px">' + form +
-      (fbFormOn() ? '<div class="askothers">' + esc(FB_ASK_OTHERS) + '</div>' : "") +
-    '</div></div>' +
+    '<div class="sheetbody"><div class="pad" style="gap:14px">' + form + '</div></div>' +
     '<div class="pad" style="flex:none;gap:10px">' +
       '<div class="fbstatus" id="fb-status"></div>' +
-      (fbFormOn() ? '<ion-button id="fb-send" expand="block">Отправить</ion-button>' : "") +
+      (fbFormOn() ? '<div class="askothers">' + esc(FB_ASK_OTHERS) + '</div>' +
+        '<ion-button id="fb-send" expand="block">Отправить</ion-button>' : "") +
       tg +
     '</div>';
 
