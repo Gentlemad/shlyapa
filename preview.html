@@ -313,14 +313,16 @@
     padding:0 11px 11px;pointer-events:none}
   /* Градиент гасит контент над карточкой и уводит взгляд вниз. Тянется выше
      самой карточки, поэтому лежит в псевдоэлементе, а не в фоне. */
-  .consent:before{content:"";position:absolute;left:0;right:0;bottom:0;top:-64px;
+  /* Баннер ложится поверх экрана, ничего не отодвигая. Градиент над ним
+     гасит то, что оказалось под карточкой, и уводит взгляд вниз: без него
+     кнопки экрана торчали бы из-под баннера обрубками. Тянется заметно выше
+     карточки, поэтому живёт в псевдоэлементе, а не в её фоне. */
+  .consent:before{content:"";position:absolute;left:0;right:0;bottom:0;top:-168px;
     pointer-events:none;
-    /* Плотная часть градиента живёт ниже края карточки, а выше он почти
-       прозрачен: иначе он приглушал бы нижнюю кнопку экрана, которая как
-       раз туда и встаёт. */
     background:linear-gradient(180deg,
-      rgba(250,252,255,0) 0%, rgba(250,252,255,.18) 42%,
-      rgba(250,252,255,.72) 72%, var(--surface) 100%)}
+      rgba(250,252,255,0) 0%, rgba(250,252,255,.30) 22%,
+      rgba(250,252,255,.66) 44%, rgba(250,252,255,.90) 64%,
+      rgba(250,252,255,.99) 82%, var(--surface) 100%)}
   .consent .cbox{position:relative;pointer-events:auto;
     background:var(--raise);border:1px solid var(--line);border-radius:16px;
     padding:13px 14px 11px;
@@ -342,11 +344,6 @@
   .consent .cno{background:transparent;color:var(--accent)}
   .consent .cno:active{background:var(--accent-soft)}
 
-  /* Пока баннер висит, экран поджимается на его высоту: иначе он ложится
-     поверх нижних кнопок, а на главной это кнопка "Создать игру".
-     Высоту меряем в JS и кладём в --conh: текст переносится по-разному. */
-  .consenting .screen{padding-bottom:var(--conh,152px)}
-  .consenting .actions.stuck{bottom:var(--conh,152px)}
   @keyframes consentIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
   @media (prefers-reduced-motion:reduce){ .consent .cbox{animation:none} }
   .fbstatus{font-size:13px;min-height:18px}
@@ -724,7 +721,7 @@ var TELEGRAM_URL = "https://t.me/gentlemad";
    docs/CHANGELOG.md. Отметку сборки к нему приклеивает build.js: по версии
    понятно, что человек видел, по дате - какая именно сборка у него открыта. */
 var VERSION = "0.6";
-var BUILD = "0.6 · 2026-09-20 09:51 UTC";
+var BUILD = "0.6 · 2026-09-21 08:24 UTC";
 var FB_STORE = "shlyapa.fb.v1";
 var FB_MIN = 5, FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
 /* Счётчик символов висит на экране без дела: показываем, только когда
@@ -2252,23 +2249,9 @@ function anGate(){
   if(want){
     anAsk();
     el.hidden = false;
-    byId("app").classList.add("consenting");
-    anMeasure();
-    window.addEventListener("resize", anMeasure);
   } else {
     el.hidden = true;
-    byId("app").classList.remove("consenting");
-    window.removeEventListener("resize", anMeasure);
   }
-}
-/* Высота баннера вместе с отступом: её занимает нижний край экрана */
-function anMeasure(){
-  var box = document.querySelector("#o-consent .cbox");
-  if(!box) return;
-  /* Запас поверх высоты карточки: нижняя кнопка экрана должна встать выше
-     плотной части градиента, а не в неё. */
-  document.documentElement.style.setProperty("--conh", Math.ceil(box.offsetHeight + 34) + "px");
-  requestAnimationFrame(syncSticky);
 }
 function anAnswer(ok){
   anPatch({ok: !!ok});
