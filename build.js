@@ -72,7 +72,7 @@ function build(){
   // Рельса состояний в боевую версию не едет, но в сборке для обкатки нужна
   if(!DEV){
     const before = body.length;
-    body = body.replace(/\s*<aside class="rail">[\s\S]*?<\/aside>/, "");
+    body = body.replace(/\s*<aside class="rail"[^>]*>[\s\S]*?<\/aside>/, "");
     if(body.length === before){
       console.warn("Предупреждение: блок рельсы не найден, проверьте разметку");
     }
