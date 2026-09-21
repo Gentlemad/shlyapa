@@ -309,20 +309,20 @@
      Полоса снизу, а не оверлей на весь экран: вопрос необязательный, и
      закрывать им игру целиком было бы нечестной подачей. Игру видно за
      баннером, и он читается как предложение, а не как требование. */
-  .consent{position:absolute;left:0;right:0;bottom:0;z-index:25;
-    padding:0 11px 11px;pointer-events:none}
+  /* Отступ карточки от краёв задан один раз переменной: на него же опирается
+     градиент, и связь "сколько снизу - столько и сверху" держится сама. */
+  .consent{--cgap:11px;position:absolute;left:0;right:0;bottom:0;z-index:25;
+    padding:0 var(--cgap) var(--cgap);pointer-events:none}
   /* Градиент гасит контент над карточкой и уводит взгляд вниз. Тянется выше
      самой карточки, поэтому лежит в псевдоэлементе, а не в фоне. */
-  /* Баннер ложится поверх экрана, ничего не отодвигая. Градиент над ним
-     гасит то, что оказалось под карточкой, и уводит взгляд вниз: без него
-     кнопки экрана торчали бы из-под баннера обрубками. Тянется заметно выше
-     карточки, поэтому живёт в псевдоэлементе, а не в её фоне. */
-  .consent:before{content:"";position:absolute;left:0;right:0;bottom:0;top:-168px;
-    pointer-events:none;
+  /* Подложка баннера: фиолетовый градиент, внизу плотный, вверху прозрачный.
+     Сверху он выходит за карточку ровно на --cgap - столько же, сколько
+     карточка отстоит от низа экрана. Карточка непрозрачна и лежит поверх,
+     поэтому градиент читается ореолом вокруг неё. */
+  .consent:before{content:"";position:absolute;left:0;right:0;bottom:0;
+    top:calc(-1 * var(--cgap));pointer-events:none;
     background:linear-gradient(180deg,
-      rgba(250,252,255,0) 0%, rgba(250,252,255,.30) 22%,
-      rgba(250,252,255,.66) 44%, rgba(250,252,255,.90) 64%,
-      rgba(250,252,255,.99) 82%, var(--surface) 100%)}
+      rgba(122,90,245,0) 0%, rgba(122,90,245,1) 100%)}
   .consent .cbox{position:relative;pointer-events:auto;
     background:var(--raise);border:1px solid var(--line);border-radius:16px;
     padding:13px 14px 11px;
@@ -346,6 +346,15 @@
 
   @keyframes consentIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
   @media (prefers-reduced-motion:reduce){ .consent .cbox{animation:none} }
+  /* вопрос на финале: такая же карточка, как у титулов */
+  .survey{background:var(--raise);border-radius:14px;padding:12px 13px 13px;
+    display:flex;flex-direction:column;gap:9px}
+  .survey .sq{font-size:14px;font-weight:600;letter-spacing:-.01em;line-height:1.35}
+  .survey .sthanks{display:flex;align-items:center;gap:8px;font-size:14px;
+    font-weight:600;color:var(--ok)}
+  .survey .sthanks svg{width:17px;height:17px;flex:none}
+  /* призыв спросить остальных: подсказка, а не призыв к действию кнопкой */
+  .askothers{font-size:12px;line-height:1.4;color:var(--faint)}
   .fbstatus{font-size:13px;min-height:18px}
   .fbstatus.bad{color:var(--danger)}
   .fbstatus.ok{color:var(--ok)}
@@ -721,7 +730,7 @@ var TELEGRAM_URL = "https://t.me/gentlemad";
    docs/CHANGELOG.md. Отметку сборки к нему приклеивает build.js: по версии
    понятно, что человек видел, по дате - какая именно сборка у него открыта. */
 var VERSION = "0.6";
-var BUILD = "0.6 · 2026-09-21 08:24 UTC";
+var BUILD = "0.6 · 2026-09-21 09:02 UTC";
 var FB_STORE = "shlyapa.fb.v1";
 var FB_MIN = 5, FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
 /* Счётчик символов висит на экране без дела: показываем, только когда
@@ -735,6 +744,18 @@ var FB_FACES = [
   {face:"\uD83E\uDD29", label:"Отлично"}
 ];
 var FB_KINDS = ["Поломка", "Неудобство", "Предложение", "Впечатление"];
+/* Отзыв даёт тот, у кого в руках телефон, а играли все. Одна строка в двух
+   местах, чтобы тексты не разъехались. */
+var FB_ASK_OTHERS = "Можно передать телефон остальным игрокам \u2014 их отзыв тоже пригодится.";
+
+/* ---------- вопрос на финале ----------
+   Появляется не с первой партии: после одной игры человеку нечего сравнивать,
+   а после третьей он уже знает, где было неудобно. Заодно первые партии
+   проходят без лишнего вопроса на экране. */
+var SURVEY_AFTER = 3;
+var SURVEY_Q = "Был момент, когда было непонятно, что происходит?";
+var SURVEY_OPTS = ["Нет", "Да, на смене раунда", "Да, в другом месте"];
+var svAns = "", svText = "", svBusy = false;
 var fbRate = 0, fbKind = "", fbReach = false;
 
 /* ============================================================
@@ -1806,9 +1827,90 @@ function renderRoster(){
 function fbGet(k){ try{ return localStorage.getItem(FB_STORE+"."+k); }catch(e){ return null; } }
 function fbSet(k,v){ try{ localStorage.setItem(FB_STORE+"."+k, v); }catch(e){} }
 function fbDel(k){ try{ localStorage.removeItem(FB_STORE+"."+k); }catch(e){} }
+/* Сколько партий доиграно на этом устройстве. Живёт отдельно от истории:
+   та хранит только три последние, а нам нужен счётчик без потолка. */
+function fbGames(){ var n = parseInt(fbGet("games") || "0", 10); return isFinite(n) ? n : 0; }
 
 /* Один и тот же вход с трёх экранов: разные надписи читались как разные
    возможности, хотя ведут в одно место. */
+function surveyOn(){
+  return fbFormOn() && fbGames() >= SURVEY_AFTER && !(S && S._svSent);
+}
+function surveyHTML(){
+  if(!surveyOn()) return "";
+  var opts = SURVEY_OPTS.map(function(o){
+    return '<button class="chipb" data-sv="'+esc(o)+'" aria-pressed="'+(svAns===o)+'">'+esc(o)+'</button>';
+  }).join("");
+  /* Поле для текста раскрывается только на "да": на "нет" уточнять нечего,
+     и пустое поле на экране выглядело бы как недоделанная работа. */
+  var more = (svAns && svAns !== SURVEY_OPTS[0])
+    ? '<textarea class="tf ta tfwide" id="sv-text" maxlength="'+FB_MAX+'" '+
+        'placeholder="Что именно было непонятно?"></textarea>'
+    : "";
+  var send = svAns
+    ? '<ion-button id="sv-send" expand="block" size="small">Отправить</ion-button>'
+    : "";
+  return '<div class="survey">'+
+      '<div class="sq">'+esc(SURVEY_Q)+'</div>'+
+      '<div class="chips" id="sv-opts">'+opts+'</div>'+
+      more +
+      '<div class="fbstatus" id="sv-status"></div>'+
+      send +
+      '<div class="askothers">'+esc(FB_ASK_OTHERS)+'</div>'+
+    '</div>';
+}
+function surveyThanks(){
+  return '<div class="survey"><div class="sthanks">'+IC.check+'Спасибо, ответ ушёл</div>'+
+    '<div class="askothers">'+esc(FB_ASK_OTHERS)+'</div></div>';
+}
+function bindSurvey(root){
+  root.querySelectorAll("[data-sv]").forEach(function(b){
+    b.onclick = function(){
+      svAns = (svAns === b.dataset.sv) ? "" : b.dataset.sv;
+      renderResults();
+    };
+  });
+  var t = byId("sv-text");
+  if(t) t.value = svText || "";
+  if(t) t.oninput = function(){ svText = t.value; };
+  var go = byId("sv-send");
+  if(go) go.onclick = surveySend;
+}
+function surveySend(){
+  if(!svAns || svBusy) return;
+  var note = (byId("sv-text") ? byId("sv-text").value : "").trim().slice(0, FB_MAX);
+  svBusy = true;
+  var st = byId("sv-status");
+  if(st){ st.className = "fbstatus"; st.textContent = "Отправляем..."; }
+
+  track("survey_answered", {a:svAns, comment:!!note, games:fbGames()});
+
+  var ctrl = null, timer = null;
+  try{ ctrl = new AbortController(); }catch(e){}
+  if(ctrl) timer = setTimeout(function(){ try{ ctrl.abort(); }catch(e){} }, FB_TIMEOUT_MS);
+
+  fetch(FEEDBACK_URL, {
+    method:"POST", mode:"cors", headers:{"content-type":"application/json"},
+    body: JSON.stringify({
+      kind: "Вопрос на финале",
+      text: SURVEY_Q + "\n> " + svAns + (note ? "\n\n" + note : ""),
+      ctx: fbContext()
+    }),
+    signal: ctrl ? ctrl.signal : undefined
+  }).then(function(r){
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    if(timer) clearTimeout(timer);
+    svBusy = false;
+    S._svSent = true; svAns = ""; svText = "";
+    buzz(12); save(); renderResults();
+  }).catch(function(){
+    if(timer) clearTimeout(timer);
+    svBusy = false;
+    var e = byId("sv-status");
+    if(e){ e.className = "fbstatus bad"; e.textContent = "Не отправилось. Попробуйте ещё раз"; }
+  });
+}
+
 function fbLink(id){
   return '<button class="fblink" id="' + id + '">' +
     '<span class="hornic">' + IC.horn + '</span>Поделиться обратной связью</button>';
@@ -1950,7 +2052,9 @@ function renderFeedback(){
   inner.innerHTML =
     '<div class="hdr"><div class="hside">' + hbtn("fb-close", IC.back, "Назад") + '</div>' +
     '<div class="htitle">Обратная связь</div><div class="hside right"></div></div>' +
-    '<div class="sheetbody"><div class="pad" style="gap:14px">' + form + '</div></div>' +
+    '<div class="sheetbody"><div class="pad" style="gap:14px">' + form +
+      (fbFormOn() ? '<div class="askothers">' + esc(FB_ASK_OTHERS) + '</div>' : "") +
+    '</div></div>' +
     '<div class="pad" style="flex:none;gap:10px">' +
       '<div class="fbstatus" id="fb-status"></div>' +
       (fbFormOn() ? '<ion-button id="fb-send" expand="block">Отправить</ion-button>' : "") +
@@ -2919,6 +3023,9 @@ function finish(){
   stopTimer(); wakeOff();
   var snap = titlesSnapshot(), sc = scores();
   S.phase="results"; S.turn=null; S.rtab="score";
+  /* Счётчик партий растёт ДО отрисовки: вопрос на финале смотрит на него,
+     и на третьей партии экран должен увидеть уже тройку, а не двойку. */
+  fbSet("games", String(fbGames() + 1));
   go();
   pushHist({
     at:Date.now(), durationMs: Date.now() - (S.createdAt || Date.now()),
@@ -2976,6 +3083,14 @@ function renderResults(){
     '</div>'+
     '<div class="radarwrap"><div class="radarcap">итоговый расклад</div>'+radarSVG()+'</div>';
 
+  /* Вопрос стоит сразу после таблицы мест: туда смотрят, ничего не
+     прокручивая, а титулы и радар остаются наградой ниже. */
+  var svBlock = (S._svSent && fbGames() >= SURVEY_AFTER) ? surveyThanks() : surveyHTML();
+  if(svBlock){
+    var mark = '<div class="titles">';
+    scoreTab = scoreTab.replace(mark, svBlock + mark);
+  }
+
   el.innerHTML =
     '<div class="tabwrap">'+segHTML("res-tabs",["Счёт","Журнал"], isLog?"Журнал":"Счёт")+'</div>'+
     '<div class="pad" style="gap:14px">'+
@@ -2993,6 +3108,7 @@ function renderResults(){
     var t=(v==="Журнал")?"log":"score";
     if(t!==S.rtab){ S.rtab=t; renderResults(); }
   });
+  bindSurvey(el);
   bindJournal(el);
   var fb=byId("res-fb");
   if(fb) fb.onclick=openFeedback;
