@@ -247,6 +247,69 @@
   .tfwide{width:100%;display:block;flex:none}
   .fbhint{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--faint)}
   /* оценка: пять лиц, невыбранные приглушены, чтобы выбранное читалось сразу */
+  /* Экран для тех, кто открыл игру не с телефона. Занимает всё окно, но не
+     запирает: игра на компьютере работает, просто передавать мышь по кругу
+     неудобно, и об этом честнее сказать сразу. */
+  .deskwall{position:fixed;inset:0;z-index:90;background:var(--raise);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:32px 24px;overflow:hidden}
+  .deskwall h1{position:relative;z-index:1;margin:0 0 14px;font-size:29px;letter-spacing:-.02em;text-wrap:balance;max-width:24ch}
+  .deskwall p{position:relative;z-index:1;margin:0;font-size:16px;color:var(--muted);max-width:44ch;line-height:1.55;text-wrap:pretty}
+  .deskwall .dwgo{position:relative;z-index:1;margin-top:30px;border:1px solid var(--line-strong);background:var(--raise);
+    color:var(--ink);font:inherit;font-size:14.5px;font-weight:600;cursor:pointer;
+    padding:12px 22px;border-radius:12px}
+  .deskwall .dwgo:hover{border-color:var(--accent);color:var(--accent)}
+
+  /* Фон предупреждения: цветные пятна расходятся к краям, середина остаётся
+     светлой, чтобы текст читался без подложки. Пятна — это radial-gradient,
+     а не solid + blur: размытие пришлось бы пересчитывать на каждом кадре,
+     а градиент рисуется один раз и дальше только composited transform. */
+  .deskwall .dwbg{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+  .deskwall .dwbg i{position:absolute;display:block;border-radius:50%;will-change:transform}
+  .deskwall .dwbg .b1{width:78vmax;height:78vmax;left:-30vmax;top:-26vmax;
+    background:radial-gradient(circle,rgba(31,111,235,.50) 0%,rgba(31,111,235,.20) 42%,rgba(31,111,235,0) 70%);
+    animation:dwFloat1 23s ease-in-out infinite}
+  .deskwall .dwbg .b2{width:72vmax;height:72vmax;right:-28vmax;top:-20vmax;
+    background:radial-gradient(circle,rgba(122,90,245,.46) 0%,rgba(122,90,245,.18) 42%,rgba(122,90,245,0) 70%);
+    animation:dwFloat2 31s ease-in-out infinite}
+  .deskwall .dwbg .b3{width:82vmax;height:82vmax;left:12vmax;bottom:-40vmax;
+    background:radial-gradient(circle,rgba(90,169,247,.52) 0%,rgba(90,169,247,.22) 42%,rgba(90,169,247,0) 70%);
+    animation:dwFloat3 37s ease-in-out infinite}
+  .deskwall .dwbg .b4{width:64vmax;height:64vmax;right:-22vmax;bottom:-30vmax;
+    background:radial-gradient(circle,rgba(31,111,235,.34) 0%,rgba(31,111,235,.13) 42%,rgba(31,111,235,0) 70%);
+    animation:dwFloat4 29s ease-in-out infinite}
+  /* светлая сердцевина поверх пятен */
+  .deskwall .dwbg::after{content:"";position:absolute;inset:0;
+    background:radial-gradient(circle at 50% 47%,
+      #fff 0%,rgba(255,255,255,.96) 22%,rgba(255,255,255,.72) 40%,
+      rgba(255,255,255,.28) 58%,rgba(255,255,255,0) 76%)}
+  /* Длительности взаимно непропорциональны, и ни один путь не идёт по
+     диагонали из угла в угол — иначе пятна ходят строем. */
+  @keyframes dwFloat1{
+    0%{transform:translate3d(0,0,0) scale(1)}
+    27%{transform:translate3d(9vmax,5vmax,0) scale(1.09)}
+    54%{transform:translate3d(4vmax,13vmax,0) scale(.95)}
+    78%{transform:translate3d(-6vmax,7vmax,0) scale(1.05)}
+    100%{transform:translate3d(0,0,0) scale(1)}}
+  @keyframes dwFloat2{
+    0%{transform:translate3d(0,0,0) scale(1)}
+    31%{transform:translate3d(-11vmax,8vmax,0) scale(.93)}
+    58%{transform:translate3d(-3vmax,17vmax,0) scale(1.11)}
+    81%{transform:translate3d(6vmax,6vmax,0) scale(1.02)}
+    100%{transform:translate3d(0,0,0) scale(1)}}
+  @keyframes dwFloat3{
+    0%{transform:translate3d(0,0,0) scale(1)}
+    24%{transform:translate3d(-8vmax,-9vmax,0) scale(1.07)}
+    49%{transform:translate3d(7vmax,-4vmax,0) scale(.94)}
+    73%{transform:translate3d(12vmax,-12vmax,0) scale(1.08)}
+    100%{transform:translate3d(0,0,0) scale(1)}}
+  @keyframes dwFloat4{
+    0%{transform:translate3d(0,0,0) scale(1)}
+    35%{transform:translate3d(-13vmax,-6vmax,0) scale(1.06)}
+    62%{transform:translate3d(-5vmax,-15vmax,0) scale(.96)}
+    84%{transform:translate3d(4vmax,-8vmax,0) scale(1.03)}
+    100%{transform:translate3d(0,0,0) scale(1)}}
+
   /* уголок над геро: кнопка не должна спорить с логотипом за внимание */
   .topright{display:flex;justify-content:flex-end;margin-bottom:-6px}
   .ghostbtn{width:40px;height:40px;display:grid;place-items:center;border:0;
@@ -698,6 +761,9 @@
     .dotlayer,.screen.enter,.overlay,.mood,.radarpoly,
     .dphone,.dword,.dcard,.dplus,.dmode,.dscore,.toast,
     .hintbox,.hintbox.lit,.hintbox .hl,.hintbox .hl.blink,.hintbox .hq.in{animation:none}
+    /* перечислены поимённо: у .dwbg .bN специфичность выше, чем у .dwbg i */
+    .deskwall .dwbg .b1,.deskwall .dwbg .b2,
+    .deskwall .dwbg .b3,.deskwall .dwbg .b4{animation:none}
     .hintbox .hq{transition:none}
     /* без анимации фреймы показывают конечное состояние, а не пустоту */
     .dword,.dplus,.dscore{opacity:1}
@@ -842,8 +908,8 @@ var TELEGRAM_URL = "https://t.me/gentlemad";
 /* Номер версии правится руками при выпуске, вместе с записью в
    docs/CHANGELOG.md. Отметку сборки к нему приклеивает build.js: по версии
    понятно, что человек видел, по дате - какая именно сборка у него открыта. */
-var VERSION = "0.7";
-var BUILD = "0.7 · 2026-09-20 10:00 UTC";
+var VERSION = "0.8";
+var BUILD = "0.8 · 2026-09-21 12:33 UTC";
 var FB_STORE = "shlyapa.fb.v1";
 var FB_MIN = 5, FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
 /* Счётчик символов висит на экране без дела: показываем, только когда
@@ -900,6 +966,7 @@ var IC = {
   close: sv('<path d="M6 6l12 12M18 6L6 18"/>'),
   pause: sv('<path d="M9 5v14M15 5v14"/>', 2.2),
   list:  sv('<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>'),
+  phone: sv('<rect x="6.5" y="2.5" width="11" height="19" rx="2.6"/><path d="M10.6 5.6h2.8"/><path d="M11 18.6h2"/>'),
   people:sv('<path d="M16 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 17.5V19"/><circle cx="10" cy="8" r="3.2"/><path d="M20 19v-1.4a3.2 3.2 0 0 0-2.5-3.1M16 5.2a3.2 3.2 0 0 1 0 6"/>'),
   down:  sv('<path d="M12 5v14M6 13l6 6 6-6"/>', 2.1),
   up:    sv('<path d="M12 19V5M6 11l6-6 6 6"/>', 2.1),
@@ -1541,6 +1608,32 @@ function replayFrom(g){
   S=freshState(g.players.map(function(p){ return p.name; }), g.settings||S.settings);
   S.devState=dv; S.phase="entry"; S.entryIndex=0;
   go();
+}
+
+/* Мышь с точным курсором и наведением - признак компьютера. По ширине судить
+   нельзя: планшет в альбомной ориентации шире многих ноутбуков. */
+function onDesktop(){
+  try{ return window.matchMedia("(hover:hover) and (pointer:fine)").matches; }catch(e){ return false; }
+}
+function deskWallOff(){ return fbGet("deskwall") === "off"; }
+
+/* Стена показывается поверх всего, а не внутри экрана: она не про главный
+   экран, а про устройство целиком. */
+function paintDeskWall(){
+  var old = byId("deskwall");
+  if(old) old.remove();
+  if(!onDesktop() || deskWallOff()) return;
+  var el = document.createElement("div");
+  el.className = "deskwall";
+  el.id = "deskwall";
+  el.innerHTML =
+    '<div class="dwbg" aria-hidden="true"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i></div>'+
+    '<h1>Игра Шляпа сделана для мобильных устройств</h1>'+
+    '<p>Поскольку каждый ход устройство передаётся между игроками, играть удобнее '+
+    'на телефоне или планшете. Рекомендуем открыть игру с телефона.</p>'+
+    '<button class="dwgo" id="dw-go">Всё равно открыть на компьютере</button>';
+  document.body.appendChild(el);
+  byId("dw-go").onclick = function(){ fbSet("deskwall","off"); el.remove(); };
 }
 
 function renderHome(){
@@ -3336,6 +3429,7 @@ function beep(){
 })();
 
 function boot(hot){
+  paintDeskWall();
   anInit();
   var restored=(hot&&hot.S)||loadCur();
   if(restored && restored.phase && ["home","setup","results","rules","stats"].indexOf(restored.phase)<0){
