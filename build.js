@@ -107,12 +107,17 @@ function build(){
   }
 
   // Артефакт оборачивает страницу в doctype/head/body сам, поэтому отдаём
-  // голый фрагмент - ровно в том виде, в каком исходник и писался. Режим
-  // приложения включаем принудительно: в артефакте нет ?app в адресе.
+  // голый фрагмент - ровно в том виде, в каком исходник и писался.
+  //
+  // Режим приложения включаем принудительно: в артефакте нет ?app в адресе.
+  // Но не в сборке для обкатки: body.appmode прячет рельсу, и состояния
+  // становится нечем переключать. На этом уже попались один раз.
   if(ARTIFACT){
-    const frag = (head + "\n" + body.trim())
-      .replace('if(q.indexOf("app") >= 0) document.body.classList.add("appmode");',
-               'document.body.classList.add("appmode");');
+    const frag = DEV
+      ? (head + "\n" + body.trim())
+      : (head + "\n" + body.trim())
+          .replace('if(q.indexOf("app") >= 0) document.body.classList.add("appmode");',
+                   'document.body.classList.add("appmode");');
     fs.writeFileSync(OUT, frag, "utf8");
     console.log("Готово: " + path.basename(OUT) + ", " +
       (Buffer.byteLength(frag, "utf8") / 1024).toFixed(1) + " КБ (для артефакта" +
