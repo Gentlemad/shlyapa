@@ -88,13 +88,17 @@
       radial-gradient(circle at 86% 84%, rgba(31,111,235,.12), rgba(31,111,235,0) 44%)}
   #app.playing .ctx{background:transparent}
 
-  /* Точки живут отдельным слоем и медленно дрейфуют. Двигаем слой трансформом,
-     а не background-position: перерисовка фона на каждом кадре телефону дорога,
-     и дрейф на нём вставал. Слой с запасом по краям, чтобы сдвиг не оголял угол. */
-  #app > .dotlayer{position:absolute;inset:-48px;z-index:0;pointer-events:none;
-    background-image:radial-gradient(circle at 1.4px 1.4px, rgba(31,111,235,.11) 1.4px, transparent 0);
+  /* Точки живут отдельным слоем: холст во всю площадь экрана приложения.
+     Точки не просто дрейфуют — по ним ходят светящиеся пятна, и каждая
+     точка сама меняет размер и цвет по тому, насколько глубоко она внутри
+     пятна. Слоем целиком такое не нарисовать, поэтому здесь холст, а не
+     background-image: одна перерисовка вместо сотен перекрашенных клеток. */
+  #app > .dotlayer{position:absolute;inset:0;z-index:0;pointer-events:none;
+    width:100%;height:100%;display:block}
+  /* Запасной путь: холста нет — остаются прежние точки и дрейф слоем.
+     Шаг кратен клетке, поэтому цикл замыкается без рывка. */
+  #app > .dotlayer.flat{background-image:radial-gradient(circle at 1.4px 1.4px, rgba(31,111,235,.11) 1.4px, transparent 0);
     background-size:20px 20px;animation:drift 9s linear infinite;will-change:transform}
-  /* шаг кратен клетке, поэтому цикл замыкается без рывка */
   @keyframes drift{from{transform:translate3d(0,0,0)}to{transform:translate3d(20px,40px,0)}}
 
   /* мягкая смена экранов */
@@ -787,7 +791,7 @@
         </div>
 
         <div id="app">
-          <div class="dotlayer" id="dots" hidden></div>
+          <canvas class="dotlayer" id="dots" hidden aria-hidden="true"></canvas>
           <div id="bar"></div>
           <div class="progbar" id="progbar"><i id="prog"></i></div>
           <div class="ctx" id="ctx" hidden></div>
@@ -907,7 +911,7 @@ var TELEGRAM_URL = "https://t.me/gentlemad";
 /* Номер версии правится руками при выпуске, вместе с записью в
    docs/CHANGELOG.md. Отметку сборки к нему приклеивает build.js: по версии
    понятно, что человек видел, по дате - какая именно сборка у него открыта. */
-var VERSION = "0.8";
+var VERSION = "0.9";
 var BUILD = "dev";
 var FB_STORE = "shlyapa.fb.v1";
 var FB_MIN = 5, FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
@@ -3331,7 +3335,7 @@ function go(){
 
   var playing = ["handoff","turn","review"].indexOf(S.phase) >= 0;
   byId("app").classList.toggle("playing", playing);
-  byId("dots").hidden = !(playing || S.phase === "home");
+  dotsOn(playing || S.phase === "home");
   if(S.phase !== "home"){ clearInterval(hatTimer); hatTimer = null; }
   if(S.phase !== "entry") stopHints();
 
@@ -3427,9 +3431,263 @@ function beep(){
   r.parentNode.insertBefore(b, r.nextSibling);
 })();
 
+/* ====================== СВЕТЯЩИЕСЯ ТОЧКИ ======================
+   По полю точек медленно ходят пятна света. Точка внутри пятна становится
+   крупнее, ярче и меняет цвет по ленте «голубой → синий → фиолетовый»;
+   снаружи остаётся такой же, какой была до 0.9. Характер движения пятен
+   выбирается случайно при запуске из четырёх: мягкие пятна, дыхание, живые
+   кляксы, волна наискось.
+
+   Почему холст, а не CSS. Пятно меняет каждую точку по отдельности —
+   слоем целиком это не нарисовать, а тысяча DOM-узлов с анимацией телефон
+   не потянет. Холст перерисовывает всё разом.
+
+   Чего это стоит. Около тысячи точек на кадр при 30 кадрах в секунду.
+   Дорогое здесь — не рисование, а склейка строк цвета, поэтому кисти
+   посчитаны заранее (LUT), а точки одного оттенка рисуются одной заливкой. */
+var DOT_GRID = 20, DOT_R = 1.4, DOT_A = 0.11;   /* совпадает с точками до 0.9 */
+var DOT_RAMP = [[0, 90,169,247], [0.45, 31,111,235], [1, 122,90,245]];
+var DOT_POS = [0.45, 0, 1];              /* c: 0 синий, 1 голубой, 2 фиолетовый */
+var DOT_CN = 24, DOT_AN = 24;            /* дробность ленты и прозрачности */
+var DOT_SPEED = 1.7, DOT_POWER = 0.45;   /* «живее» и «тихо» */
+var dotLUT = null;
+
+function dotRampAt(x){
+  for(var i=1;i<DOT_RAMP.length;i++){
+    if(x <= DOT_RAMP[i][0] || i === DOT_RAMP.length-1){
+      var a = DOT_RAMP[i-1], b = DOT_RAMP[i];
+      var t = (x - a[0]) / (b[0] - a[0]);
+      if(t < 0) t = 0;
+      if(t > 1) t = 1;
+      return [Math.round(a[1]+(b[1]-a[1])*t),
+              Math.round(a[2]+(b[2]-a[2])*t),
+              Math.round(a[3]+(b[3]-a[3])*t)];
+    }
+  }
+}
+
+/* Строки кистей считаются один раз: иначе на каждый кадр уходили бы сотни
+   склеек строк и мусор для сборщика. */
+function dotBuildLUT(){
+  dotLUT = [];
+  for(var ci=0; ci<DOT_CN; ci++){
+    var col = dotRampAt(ci/(DOT_CN-1));
+    dotLUT[ci] = [];
+    for(var ai=0; ai<DOT_AN; ai++){
+      var f = (ai+0.5)/DOT_AN;
+      dotLUT[ci][ai] = "rgba("+col[0]+","+col[1]+","+col[2]+","+(DOT_A + 0.72*f*DOT_POWER).toFixed(3)+")";
+    }
+  }
+}
+
+/* Характеры движения. Стоимость на точку у них разная, дороже всех «кляксы»
+   (арктангенс на точку), поэтому именно ими и мерили запас по кадрам. */
+var DOT_KINDS = [
+  function(){ return [
+    {kind:"orbit", cx:.22, cy:.24, rx:.30, ry:.22, r:.50, c:0, t:0,   sp:.055},
+    {kind:"orbit", cx:.78, cy:.72, rx:.26, ry:.28, r:.46, c:2, t:2.1, sp:.045},
+    {kind:"orbit", cx:.50, cy:.48, rx:.34, ry:.18, r:.40, c:1, t:4.0, sp:.035}]; },
+  function(){ return [
+    {kind:"pulse", cx:.24, cy:.26, r:.46, c:0, t:0,   sp:.13},
+    {kind:"pulse", cx:.76, cy:.34, r:.42, c:2, t:2.2, sp:.10},
+    {kind:"pulse", cx:.48, cy:.80, r:.44, c:1, t:4.4, sp:.11}]; },
+  function(){ return [
+    {kind:"blob", cx:.28, cy:.30, rx:.34, ry:.24, r:.52, c:0, t:0,   sp:.05,  wob:.34},
+    {kind:"blob", cx:.72, cy:.68, rx:.28, ry:.32, r:.48, c:2, t:3.0, sp:.042, wob:.40}]; },
+  function(){ return [
+    {kind:"wave", ang:-0.32, w:.30, c:0, t:0,   sp:.09},
+    {kind:"wave", ang:-0.32, w:.26, c:2, t:1.3, sp:.09}]; }
+];
+
+function dotMod(v, m){ return ((v % m) + m) % m; }  /* в JS остаток бывает отрицательным */
+
+var dotField = null;
+
+function dotFieldMake(canvas){
+  var ctx = null;
+  try{ ctx = canvas.getContext("2d", {alpha:true}); }catch(e){}
+  if(!ctx){ canvas.classList.add("flat"); return null; }   /* запасной путь */
+
+  var w=0, h=0, dots=[], blobs=[], t=0, raf=null, last=0, on=false, seen=true;
+  var drift = {x:0, y:0, ang:Math.random()*6.283};
+
+  /* Характер и фазы выбираются заново при каждом запуске игры: два открытия
+     подряд не дадут одинаковую картинку. */
+  function spawn(){
+    blobs = DOT_KINDS[Math.floor(Math.random()*DOT_KINDS.length)]();
+    blobs.forEach(function(b){
+      b.p1 = Math.random()*6.283; b.p2 = Math.random()*6.283; b.p3 = Math.random()*6.283;
+    });
+  }
+
+  function resize(){
+    var r = canvas.getBoundingClientRect();
+    var nw = Math.max(1, Math.round(r.width)), nh = Math.max(1, Math.round(r.height));
+    if(nw === w && nh === h) return;
+    /* 1:1 к CSS-пикселям, без множителя плотности экрана: точки мелкие и
+       мягкие, retina тут ничего не добавит, а площадь вырастет вчетверо. */
+    w = canvas.width = nw; h = canvas.height = nh;
+    dots = [];
+    /* сетка с запасом по краям: дрейф не должен оголять угол */
+    for(var y=-DOT_GRID; y<h+DOT_GRID; y+=DOT_GRID)
+      for(var x=-DOT_GRID; x<w+DOT_GRID; x+=DOT_GRID) dots.push(x, y);
+    if(!on) draw(t);            /* погашенный слой тоже должен быть верного размера */
+  }
+
+  /* Путь пятна — сумма синусов с несоизмеримыми частотами. Такая кривая не
+     замыкается, поэтому маршрут не повторяется и не читается как «по
+     диагонали». Считается раз на пятно за кадр, а не на каждую точку. */
+  function centre(b, time){
+    /* «Дыхание» стоит на месте и пульсирует радиусом — орбиты у него нет,
+       и полей rx/ry тоже: без этой проверки координаты выходили NaN, и
+       пятно просто не зажигалось. */
+    if(b.kind !== "orbit" && b.kind !== "blob") return [b.cx*w, b.cy*h];
+    var a = time*b.sp*6 + b.t;
+    var x = b.cx + b.rx*(Math.sin(a)*0.58 + Math.sin(a*1.618 + b.p1)*0.42);
+    var y = b.cy + b.ry*(Math.cos(a*0.87 + b.p2)*0.56 + Math.sin(a*1.414 + b.p3)*0.44);
+    return [x*w, y*h];
+  }
+
+  function draw(time){
+    /* Масштаб пятен — среднее геометрическое сторон, а не меньшая сторона.
+       По меньшей стороне на узком высоком экране телефона пятно съёживалось
+       и закрывало 0.59 высоты вместо 0.79, как задумано; свечение переставало
+       читаться. Среднее геометрическое держит одну долю экрана при любой
+       форме холста. */
+    var min = Math.sqrt(w*h);
+    var buckets = {}, plain = [];
+
+    for(var i=0;i<dots.length;i+=2){
+      var dx = dots[i] + drift.x, dy = dots[i+1] + drift.y;
+      var sum = 0, mixNum = 0;
+      for(var b=0;b<blobs.length;b++){
+        var bl = blobs[b], e = 0;
+        if(bl.kind==="wave"){
+          /* расстояние до наклонной линии, которая едет поперёк экрана */
+          var pos = ((time*bl.sp + bl.t) % 2.4 - 0.7) * w * 1.1;
+          var d = Math.abs((dx - pos) * Math.cos(bl.ang) + dy * Math.sin(bl.ang));
+          var wd = bl.w * min * 1.6;
+          e = d < wd ? 1 - d/wd : 0;
+          e = e*e;
+        } else {
+          var p = centre(bl, time);
+          var rr = bl.r * min;
+          if(bl.kind==="pulse") rr *= 0.72 + 0.42*(0.5+0.5*Math.sin(time*bl.sp*2 + bl.t));
+          if(bl.kind==="blob"){
+            /* форма перетекает: радиус зависит от направления на точку */
+            var ang = Math.atan2(dy-p[1], dx-p[0]);
+            rr *= 1 + bl.wob*0.5*Math.sin(ang*3 + time*bl.sp*3) * Math.sin(ang*2 - time*bl.sp*2);
+          }
+          var ddx = dx-p[0], ddy = dy-p[1];
+          var q = (ddx*ddx + ddy*ddy) / (rr*rr);
+          e = q < 1 ? (1-q)*(1-q) : 0;
+          if(bl.kind==="pulse") e *= 0.35 + 0.65*(0.5+0.5*Math.sin(time*bl.sp*2 + bl.t));
+        }
+        sum += e;
+        mixNum += e * DOT_POS[bl.c];
+      }
+      var en = sum > 1 ? 1 : sum;
+      if(en < 0.04){ plain.push(dx, dy); continue; }
+      /* Цвет — взвешенная смесь по ленте, а не «цвет ближайшего пятна»:
+         иначе на стыке двух пятен оттенок переключался бы лесенкой. */
+      var mix = sum > 0 ? mixNum / sum : 0.45;
+      var ci = (mix*(DOT_CN-1) + 0.5)|0;
+      if(ci < 0) ci = 0;
+      if(ci > DOT_CN-1) ci = DOT_CN-1;
+      var ai = (en*DOT_AN)|0;
+      if(ai > DOT_AN-1) ai = DOT_AN-1;
+      var key = ci*DOT_AN + ai;
+      (buckets[key] || (buckets[key] = [])).push(dx, dy);
+    }
+
+    ctx.clearRect(0,0,w,h);
+    ctx.fillStyle = "rgba(31,111,235," + DOT_A + ")";
+    ctx.beginPath();
+    for(var k=0;k<plain.length;k+=2){
+      ctx.moveTo(plain[k]+DOT_R, plain[k+1]);
+      ctx.arc(plain[k], plain[k+1], DOT_R, 0, 6.2832);
+    }
+    ctx.fill();
+    /* Подсвеченные точки рисуются пачками по оттенку. Пачек много, шаг
+       мелкий — границы между ними глаз не ловит; пустые не стоят ничего. */
+    for(var kk in buckets){
+      var arr = buckets[kk];
+      var kc = (kk/DOT_AN)|0, ka = kk % DOT_AN;
+      var f = (ka+0.5)/DOT_AN;
+      ctx.fillStyle = dotLUT[kc][ka];
+      var rad = DOT_R + 2.3*f*DOT_POWER;
+      ctx.beginPath();
+      for(var m=0;m<arr.length;m+=2){
+        ctx.moveTo(arr[m]+rad, arr[m+1]);
+        ctx.arc(arr[m], arr[m+1], rad, 0, 6.2832);
+      }
+      ctx.fill();
+    }
+  }
+
+  function tick(now){
+    raf = requestAnimationFrame(tick);
+    if(!on || !seen){ last = now; return; }
+    if(now - last < 32) return;                  /* около 30 кадров в секунду */
+    var dt = Math.min(0.1, (now - last)/1000) * DOT_SPEED;
+    last = now;
+    t += dt;
+    /* Направление дрейфа медленно поворачивается. При постоянном направлении
+       сетка всегда ползла вправо-вниз, и это читалось как общая диагональ. */
+    drift.ang += dt*0.21;
+    drift.x = dotMod(drift.x + Math.cos(drift.ang)*dt*4.5, DOT_GRID);
+    drift.y = dotMod(drift.y + Math.sin(drift.ang*0.73)*dt*4.5, DOT_GRID);
+    draw(t);
+  }
+
+  dotBuildLUT();
+  spawn();
+  resize();
+
+  /* Без движения — один кадр и тишина: ни таймера, ни наблюдателей. */
+  if(reduced()){ draw(1.4); return {resize:resize, set:function(){}}; }
+
+  raf = requestAnimationFrame(tick);
+  /* Вкладку свернули — холст перестаёт считать. Иначе фон продолжает
+     жечь батарею, пока телефон лежит экраном вниз. */
+  document.addEventListener("visibilitychange", function(){
+    seen = !document.hidden;
+    if(seen) last = 0;
+  });
+
+  return {
+    resize: resize,
+    set: function(v){
+      if(v === on) return;
+      on = v;
+      if(on) last = 0;            /* пауза не должна обернуться скачком времени */
+    }
+  };
+}
+
+function dotsOn(v){
+  var el = byId("dots");
+  el.hidden = !v;
+  if(!dotField) return;
+  if(v) dotField.resize();
+  dotField.set(v);
+}
+
+function dotsInit(){
+  var el = byId("dots");
+  dotField = dotFieldMake(el);
+  if(!dotField) return;
+  try{
+    new ResizeObserver(function(){ dotField.resize(); }).observe(byId("app"));
+  }catch(e){
+    window.addEventListener("resize", function(){ dotField.resize(); });
+  }
+}
+
 function boot(hot){
   paintDeskWall();
   anInit();
+  dotsInit();
   var restored=(hot&&hot.S)||loadCur();
   if(restored && restored.phase && ["home","setup","results","rules","stats"].indexOf(restored.phase)<0){
     S=restored;
