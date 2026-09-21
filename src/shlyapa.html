@@ -747,7 +747,7 @@ var FB_FACES = [
 var FB_KINDS = ["Поломка", "Неудобство", "Предложение", "Впечатление"];
 /* Отзыв даёт тот, у кого в руках телефон, а играли все. Одна строка в двух
    местах, чтобы тексты не разъехались. */
-var FB_ASK_OTHERS = "\u2764\uFE0F Вы также можете спросить обратную связь у других игроков, отзывы всей компании важны";
+var FB_ASK_OTHERS = "Вы также можете спросить обратную связь у других игроков, отзывы всей компании важны \u2764\uFE0F";
 
 /* ---------- вопрос на финале ----------
    Появляется не с первой партии: после одной игры человеку нечего сравнивать,
@@ -778,6 +778,11 @@ var fbRate = 0, fbKind = "", fbReach = false;
 var EVENTS_URL = "https://shlyapa-feedback.grudanovartyom.workers.dev/e";
 var METRIKA_ID = 112813431;
 var AN_STORE = "shlyapa.an.v1";
+/* Сборка для обкатки (build.js --dev) ставит это в true. Она ходит по
+   экранам рельсой, и её прыжки не должны попадать ни в базу, ни в Метрику:
+   иначе разработка выглядела бы как самая активная компания в продукте.
+   Баннер при этом показывать надо - его же и смотрим. */
+var DEV_BUILD = false;
 /* Полным адресом, а не относительным: в артефакте прототипа относительный
    ссылается в пустоту, а страница политики живёт рядом с боевой сборкой. */
 var PRIVACY_URL = "https://gentlemad.github.io/shlyapa/privacy.html";
@@ -1213,7 +1218,10 @@ var DEV_STATES = [
   ["entry","Ввод слов"], ["entry-done","Ввод завершён"], ["roster","Список игроков"],
   ["handoff","Передача"], ["turn","Ход"], ["boundary","Граница раунда"],
   ["review","Итог хода"], ["round3","Финальный раунд"],
-  ["sheet","Пауза"], ["results","Финал"]
+  ["sheet","Пауза"], ["results","Финал"],
+  /* Экраны, до которых обычным путём идти долго: баннер показывается один
+     раз на устройство, вопрос на финале - только с третьей партии. */
+  ["consent","Баннер cookie"], ["survey","Вопрос на финале"], ["feedback","Форма отзыва"]
 ];
 function renderDev(){
   var host=byId("dev-chips"), sel=(S && S.devState)||"home";
@@ -1262,10 +1270,26 @@ function simTurn(){
 }
 function devJump(target){
   stopTimer(); kbHide(); wakeOff();
-  byId("o-sheet").hidden=true; byId("o-flash").hidden=true; byId("o-roster").hidden=true;
+  /* Гасим все оверлеи, иначе открытый на прошлом состоянии повиснет поверх
+     нового. Добавили оверлей - добавьте и сюда. */
+  ["o-sheet","o-flash","o-roster","o-fb","o-consent"].forEach(function(id){
+    var el = byId(id); if(el) el.hidden = true;
+  });
   var keep = S ? S.settings : null;
 
   if(target==="home"){ S=freshState([],keep); S.devState="home"; go(); return; }
+
+  /* Согласие спрашивают один раз на устройство: чтобы увидеть баннер снова,
+     ответ надо стереть и поднять слой заново. */
+  if(target==="consent"){
+    try{ localStorage.removeItem(AN_STORE); }catch(e){}
+    AN.ok=null; AN.q=[]; AN.install=""; AN.sit=""; AN.phase="";
+    S=freshState([],keep); S.devState=target;
+    anInit(); go(); return;
+  }
+  if(target==="feedback"){
+    S=freshState([],keep); S.devState=target; go(); openFeedback(); return;
+  }
   if(target==="rules"||target==="stats"){ S=freshState([],keep); S.devState=target; S.phase=target; go(); return; }
   if(target==="setup-empty"){ S=freshState([],keep); S.devState=target; S.phase="setup"; go(); return; }
   if(target==="setup"){ S=freshState(SEED_NAMES.slice(0,5),keep); S.devState=target; S.phase="setup"; go(); return; }
@@ -1298,6 +1322,14 @@ function devJump(target){
   if(target==="round3"){ var g=0; while(S.round<3&&g++<400){ if(simTurn()) break; } S.phase="handoff"; go(); return; }
   if(target==="sheet"){ simTurn(); simTurn(); S.phase="handoff"; go(); openSheet("score"); return; }
   if(target==="results"){ var k2=0; while(k2++<600){ if(simTurn()) break; } finish(); return; }
+  /* Вопрос на финале включается с SURVEY_AFTER-й партии. Ставим счётчик на
+     одну меньше: finish() доведёт его до порога сам, как в живой игре. */
+  if(target==="survey"){
+    fbSet("games", String(Math.max(0, SURVEY_AFTER - 1)));
+    svRate = 0; svText = "";
+    var k3=0; while(k3++<600){ if(simTurn()) break; }
+    finish(); return;
+  }
 }
 
 /* ============================================================
@@ -2226,7 +2258,7 @@ function anStandalone(){
 }
 
 function track(name, props){
-  if(!anOn()) return;
+  if(!anOn() || DEV_BUILD) return;
   var e = {at: Date.now(), n: name, p: props || {}};
   if(AN.game) e.g = AN.game;
   AN.q.push(e);
@@ -2255,7 +2287,7 @@ function anSchedule(){
    Тип text/plain выбран намеренно - с application/json браузер сначала
    спросил бы разрешение отдельным запросом, а beacon так не умеет. */
 function anFlush(beacon){
-  if(!EVENTS_URL || !anOn() || !AN.q.length || AN.sending) return;
+  if(DEV_BUILD || !EVENTS_URL || !anOn() || !AN.q.length || AN.sending) return;
   var batch = AN.q.slice(0, AN_BATCH), n = batch.length;
   var body = JSON.stringify({
     install: AN.install, sit: AN.sit, build: BUILD,
@@ -2288,7 +2320,7 @@ function anFlush(beacon){
 }
 
 function anMetrika(){
-  if(!METRIKA_ID || window.ym) return;
+  if(DEV_BUILD || !METRIKA_ID || window.ym) return;
   try{
     (function(m,e,t,r,i,k,a){
       m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
@@ -2356,7 +2388,8 @@ function anAsk(){
 function anGate(){
   var el = byId("o-consent");
   if(!el) return;
-  var want = (AN.ok === null && S && S.phase === "home" && (EVENTS_URL || METRIKA_ID));
+  var want = (AN.ok === null && S && S.phase === "home" &&
+    (EVENTS_URL || METRIKA_ID || DEV_BUILD));
   if(want === !el.hidden) return;
   if(want){
     anAsk();
