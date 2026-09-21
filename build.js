@@ -76,6 +76,12 @@ function build(){
     if(body.length === before){
       console.warn("Предупреждение: блок рельсы не найден, проверьте разметку");
     }
+    // Кнопка панели лежит вне <aside>, поэтому вырезается отдельно
+    const beforeToggle = body.length;
+    body = body.replace(/\s*<button class="railtoggle"[\s\S]*?<\/button>/, "");
+    if(body.length === beforeToggle){
+      console.warn("Предупреждение: кнопка панели не найдена, проверьте разметку");
+    }
   }
 
   // Фейковая клавиатура - тоже часть корпуса прототипа. На телефоне поле

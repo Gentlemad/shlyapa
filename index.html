@@ -56,19 +56,24 @@
      "Настройка пустая", иначе выбранное состояние читается как "Настр..." */
   .rail{flex:none;width:300px;display:flex;flex-direction:column;
     border-right:1px solid rgba(59,69,83,.2);background:rgba(255,255,255,.55);
-    padding:14px 12px;gap:12px;overflow-y:auto}
+    padding:58px 12px 14px;gap:12px;overflow-y:auto}
   /* ---------- переключатель состояний ----------
      Кнопок стало полтора десятка, и списком они занимали всю рельсу. Теперь
      это селект: видно текущее состояние, остальные - в выпадающем списке с
      поиском. Панель сворачивается, когда нужен чистый экран. */
-  .railgrip{display:flex;align-items:center;gap:7px;border:0;background:none;
-    padding:2px 2px 0;cursor:pointer;color:var(--bench-ink);font-family:var(--ui);
-    font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
-  .railgrip .gripic{width:9px;height:9px;flex:none;border-right:2px solid currentColor;
-    border-bottom:2px solid currentColor;transform:rotate(45deg);margin-top:-4px;
-    transition:transform .2s ease}
-  .rail.folded .railgrip .gripic{transform:rotate(-135deg);margin-top:2px}
-  .rail.folded .railbody{display:none}
+  /* Кнопка живёт вне рельсы и всегда поверх корпуса: в свёрнутом виде панель
+     исчезает целиком, а развернуть её по-прежнему есть чем. Что она при этом
+     накрывает угол прототипа - осознанная плата: разворачивать будут руками,
+     когда понадобится. */
+  .railtoggle{position:fixed;left:10px;top:10px;z-index:60;width:38px;height:38px;
+    display:grid;place-items:center;padding:0;cursor:pointer;
+    border:1px solid rgba(59,69,83,.22);border-radius:11px;background:#fff;
+    color:var(--bench-ink);box-shadow:0 2px 8px rgba(20,24,32,.14)}
+  .railtoggle:hover{border-color:var(--bench-ink)}
+  .railtoggle svg{width:19px;height:19px}
+  .railtoggle[aria-expanded=true]{background:var(--bench-ink);color:#fff;
+    border-color:var(--bench-ink)}
+  .rail.folded{display:none}
   .railrow{display:flex;gap:6px;align-items:stretch}
   .devsel{flex:1;min-width:0;display:flex;align-items:center;gap:8px;
     border:1px solid rgba(59,69,83,.25);background:#fff;color:var(--bench-ink);
@@ -151,9 +156,9 @@
     /* На узком экране рельса - полоса сверху. Список раскрывается поверх
        корпуса, иначе он оттолкнул бы телефон вниз и экран стало бы не видно. */
     .rail{width:auto;flex:none;flex-direction:row;align-items:center;overflow:visible;
-      border-right:0;border-bottom:1px solid rgba(59,69,83,.2);padding:7px 10px;gap:8px;
+      border-right:0;border-bottom:1px solid rgba(59,69,83,.2);
+      padding:9px 10px 9px 58px;gap:8px;
       position:relative;z-index:50;background:rgba(255,255,255,.92)}
-    .railgrip .griptext{display:none}
     .railbody{flex:1;min-width:0}
     .devmenu{position:absolute;left:10px;right:10px;top:calc(100% + 5px)}
     .devlist{max-height:46vh}
@@ -362,8 +367,8 @@
   .consent:before{content:"";position:absolute;left:0;right:0;bottom:0;
     top:calc(-1 * var(--cglow));pointer-events:none;
     background:linear-gradient(180deg,
-      rgba(232,227,251,0) 0%, rgba(232,227,251,.45) 46%,
-      rgba(232,227,251,.82) 76%, rgba(232,227,251,1) 100%)}
+      rgba(214,204,250,0) 0%, rgba(214,204,250,.48) 46%,
+      rgba(214,204,250,.84) 76%, rgba(214,204,250,1) 100%)}
   .consent .cbox{position:relative;pointer-events:auto;
     background:var(--raise);border:1px solid var(--line);border-radius:16px;
     padding:13px 14px 11px;
@@ -459,7 +464,11 @@
   /* закрепляем только когда экран реально скроллится */
   .actions{margin-top:auto;padding:10px 0 2px;display:flex;flex-direction:column;gap:8px}
   .actions.stuck{position:sticky;bottom:0;z-index:5;background:var(--surface);
-    box-shadow:0 -10px 14px -10px rgba(20,24,32,.2)}
+    box-shadow:0 -10px 14px -10px rgba(20,24,32,.2);
+    transition:box-shadow .18s ease}
+  /* Докрутили до конца - под кнопкой ничего не спрятано, и тень врёт.
+     Кнопка встаёт как обычный элемент в потоке. */
+  .actions.stuck.atend{box-shadow:none}
   .kbopen .actions.stuck{position:static;box-shadow:none}
 
   .center{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;
@@ -654,7 +663,9 @@
   .histcard{background:var(--raise);border-radius:14px;padding:12px 13px;display:flex;flex-direction:column;gap:8px}
   .histrow{display:flex;align-items:center;gap:10px}
   .histrow .hb{flex:1;min-width:0}
-  .histcard .hd{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+  /* Дата набрана тем же шрифтом, что и всё вокруг: моноширинный здесь
+     читался как чужой, он нужен только там, где важно выравнивание цифр. */
+  .histcard .hd{font-size:11.5px;color:var(--faint)}
   .histcard .hw{font-size:15px;font-weight:700;letter-spacing:-.01em}
   .histcard .hp{font-size:13px;color:var(--muted);line-height:1.35}
   .cbtn{flex:none;width:38px;height:38px;border:0;border-radius:11px;cursor:pointer;
@@ -782,9 +793,9 @@ var TELEGRAM_URL = "https://t.me/gentlemad";
    docs/CHANGELOG.md. Отметку сборки к нему приклеивает build.js: по версии
    понятно, что человек видел, по дате - какая именно сборка у него открыта. */
 var VERSION = "0.6";
-var BUILD = "0.6 · 2026-09-21 14:55 UTC";
+var BUILD = "0.6 · 2026-09-21 17:37 UTC";
 var FB_STORE = "shlyapa.fb.v1";
-var FB_MIN = 5, FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
+var FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
 /* Счётчик символов висит на экране без дела: показываем, только когда
    до предела остаётся меньше этого запаса. */
 var FB_COUNT_FROM = 200;
@@ -1989,16 +2000,18 @@ function surveySend(){
   if(!svRate || svBusy) return;
   var note = (byId("sv-text") ? byId("sv-text").value : "").trim().slice(0, FB_MAX);
   var st = byId("sv-status");
-  /* Короткий обрывок молча не выбрасываем: воркер его всё равно отвергнет,
-     а человек решит, что отправилось. */
-  if(note && note.length < FB_MIN){
-    if(st){ st.className = "fbstatus bad"; st.textContent = "Слишком короткий текст"; }
-    return;
-  }
   svBusy = true;
   if(st){ st.className = "fbstatus"; st.textContent = "Отправляем..."; }
 
   track("survey_answered", {rate:svRate, comment:!!note, games:fbGames()});
+
+  if(DEV_BUILD){
+    setTimeout(function(){
+      svBusy = false; S._svSent = true; svRate = 0; svText = "";
+      buzz(12); save(); renderResults();
+    }, 350);
+    return;
+  }
 
   var ctrl = null, timer = null;
   try{ ctrl = new AbortController(); }catch(e){}
@@ -2170,8 +2183,11 @@ function renderFeedback(){
 
   var form = fbFormOn()
     ? rate + chips +
+      /* Статус живёт под полем: ошибка про текст должна стоять рядом с
+         текстом, а не у кнопки на другом конце экрана. */
       '<div><textarea class="tf ta tfwide" id="fb-text" maxlength="' + FB_MAX + '" ' +
         'placeholder="Расскажите своими словами"></textarea>' +
+        '<div class="fbstatus" id="fb-status"></div>' +
         '<div class="fbhint"><span></span><span id="fb-count"></span></div></div>' +
       '<div style="display:flex;flex-direction:column;gap:8px">' +
         '<button class="check" id="fb-reach" aria-pressed="' + fbReach + '">' +
@@ -2189,7 +2205,6 @@ function renderFeedback(){
     '<div class="htitle">Обратная связь</div><div class="hside right"></div></div>' +
     '<div class="sheetbody"><div class="pad" style="gap:14px">' + form + '</div></div>' +
     '<div class="pad" style="flex:none;gap:10px">' +
-      '<div class="fbstatus" id="fb-status"></div>' +
       (fbFormOn() ? '<div class="askothers">' + esc(FB_ASK_OTHERS) + '</div>' +
         '<ion-button id="fb-send" expand="block">Отправить</ion-button>' : "") +
       tg +
@@ -2243,7 +2258,8 @@ function sendFeedback(){
   /* Одной оценки или категории достаточно: человек не обязан ничего писать,
      чтобы сказать, что игра понравилась. */
   if(!text && !fbRate && !fbKind){ fbStatus("Поставьте оценку или напишите пару слов", "bad"); return; }
-  if(text && text.length < FB_MIN){ fbStatus("Слишком коротко", "bad"); try{ t.focus(); }catch(e){} return; }
+  /* Длину текста не проверяем: человек делится тем, чем хочет, и "тест"
+     или "ок" - тоже отзыв. Отсекать такое значит отсекать людей. */
 
   var last = +(fbGet("last") || 0);
   var wait = Math.ceil((FB_COOLDOWN_MS - (Date.now() - last)) / 1000);
@@ -2252,6 +2268,10 @@ function sendFeedback(){
   kbHide();
   b.disabled = true;
   fbStatus("Отправляем...");
+
+  /* Демо не шлёт ничего: воркер всё равно отказал бы чужому адресу, и человек
+     видел бы "не отправилось" там, где смотрят на вид экрана, а не на связь. */
+  if(DEV_BUILD){ setTimeout(fbSent, 350); return; }
 
   var ctrl = null, timer = null;
   try{ ctrl = new AbortController(); }catch(e){}
@@ -3267,11 +3287,16 @@ var SCREENS = {
   handoff:["s-handoff",renderHandoff], turn:["s-turn",renderTurn],
   review:["s-review",renderReview], results:["s-results",renderResults]
 };
+var stickyRaf = 0;
 function syncSticky(){
   document.querySelectorAll(".actions").forEach(function(a){
     var sc = a.closest(".screen, .sheetbody");
-    if(!sc){ a.classList.remove("stuck"); return; }
-    a.classList.toggle("stuck", sc.scrollHeight > sc.clientHeight + 2);
+    if(!sc){ a.classList.remove("stuck"); a.classList.remove("atend"); return; }
+    var scrolls = sc.scrollHeight > sc.clientHeight + 2;
+    a.classList.toggle("stuck", scrolls);
+    /* Докручено до низа: тень снимаем, прятать под кнопкой уже нечего */
+    a.classList.toggle("atend",
+      !scrolls || sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 2);
   });
 }
 window.addEventListener("resize", syncSticky);
@@ -3317,6 +3342,11 @@ function go(){
     thumb.style.opacity=1;
     clearTimeout(hide);
     hide=setTimeout(function(){ thumb.style.opacity=0; },700);
+    /* Тень под закреплённой кнопкой зависит от того, докручено ли до низа,
+       поэтому пересчитываем её здесь же, а не только на перерисовке. */
+    if(!stickyRaf) stickyRaf = requestAnimationFrame(function(){
+      stickyRaf = 0; syncSticky();
+    });
   },true);
 })();
 
@@ -3378,7 +3408,7 @@ function beep(){
   fold.onclick = function(){
     var folded = rail.classList.toggle("folded");
     fold.setAttribute("aria-expanded", folded ? "false" : "true");
-    fold.title = folded ? "Развернуть панель" : "Свернуть панель";
+    fold.title = folded ? "Показать состояния" : "Скрыть состояния";
     if(folded){ devOpen = false; renderDev(); }
   };
   search.oninput = function(){ devQuery = search.value; renderDev(); };

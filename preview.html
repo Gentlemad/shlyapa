@@ -52,22 +52,60 @@
   /* прибит к вьюпорту: так корпус не может уехать за край */
   .bench{position:fixed;inset:0;display:flex;align-items:stretch;
     padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-  .rail{flex:none;width:194px;display:flex;flex-direction:column;
+  /* Шире прежнего: в селект должны помещаться длинные подписи вроде
+     "Настройка пустая", иначе выбранное состояние читается как "Настр..." */
+  .rail{flex:none;width:300px;display:flex;flex-direction:column;
     border-right:1px solid rgba(59,69,83,.2);background:rgba(255,255,255,.55);
-    padding:14px 12px;gap:12px;overflow-y:auto}
-  .railtop{display:flex;flex-direction:column;gap:1px}
-  .raileyebrow{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
-  .railname{font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--bench-ink)}
-  .railstates{display:flex;flex-direction:column;gap:4px}
-  .chip{border:1px solid rgba(59,69,83,.2);background:#fff;color:var(--bench-ink);
-    border-radius:8px;padding:7px 10px;font-size:12.5px;cursor:pointer;text-align:left;
-    display:flex;align-items:center;gap:7px}
-  .chip:hover{border-color:var(--bench-ink)}
-  .chip[aria-pressed=true]{background:var(--bench-ink);color:#fff;border-color:var(--bench-ink)}
-  .chip .n{font-family:var(--mono);font-size:9.5px;opacity:.55;width:14px;flex:none}
-  .railreset{border:1px solid rgba(31,111,235,.45);background:#fff;color:var(--accent);
-    border-radius:8px;padding:9px 10px;font-size:12.5px;font-weight:600;cursor:pointer}
-  .railnote{font-size:11px;line-height:1.35;color:var(--bench-ink);opacity:.72}
+    padding:58px 12px 14px;gap:12px;overflow-y:auto}
+  /* ---------- переключатель состояний ----------
+     Кнопок стало полтора десятка, и списком они занимали всю рельсу. Теперь
+     это селект: видно текущее состояние, остальные - в выпадающем списке с
+     поиском. Панель сворачивается, когда нужен чистый экран. */
+  /* Кнопка живёт вне рельсы и всегда поверх корпуса: в свёрнутом виде панель
+     исчезает целиком, а развернуть её по-прежнему есть чем. Что она при этом
+     накрывает угол прототипа - осознанная плата: разворачивать будут руками,
+     когда понадобится. */
+  .railtoggle{position:fixed;left:10px;top:10px;z-index:60;width:38px;height:38px;
+    display:grid;place-items:center;padding:0;cursor:pointer;
+    border:1px solid rgba(59,69,83,.22);border-radius:11px;background:#fff;
+    color:var(--bench-ink);box-shadow:0 2px 8px rgba(20,24,32,.14)}
+  .railtoggle:hover{border-color:var(--bench-ink)}
+  .railtoggle svg{width:19px;height:19px}
+  .railtoggle[aria-expanded=true]{background:var(--bench-ink);color:#fff;
+    border-color:var(--bench-ink)}
+  .rail.folded{display:none}
+  .railrow{display:flex;gap:6px;align-items:stretch}
+  .devsel{flex:1;min-width:0;display:flex;align-items:center;gap:8px;
+    border:1px solid rgba(59,69,83,.25);background:#fff;color:var(--bench-ink);
+    border-radius:9px;padding:8px 10px;font-family:var(--ui);font-size:13px;
+    font-weight:600;cursor:pointer;text-align:left}
+  .devsel:hover{border-color:var(--bench-ink)}
+  .devsel-t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .devsel-c{flex:none;width:7px;height:7px;border-right:2px solid currentColor;
+    border-bottom:2px solid currentColor;transform:rotate(45deg);margin-top:-3px;opacity:.55}
+  .devreset{flex:none;border:1px solid rgba(31,111,235,.45);background:#fff;
+    color:var(--accent);border-radius:9px;padding:0 11px;font-family:var(--ui);
+    font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap}
+  .devreset:hover{background:rgba(31,111,235,.08)}
+
+  .devmenu{display:flex;flex-direction:column;background:#fff;
+    border:1px solid rgba(59,69,83,.25);border-radius:11px;overflow:hidden;
+    box-shadow:0 10px 26px rgba(20,24,32,.18)}
+  .devsearch{flex:none;border:0;border-bottom:1px solid rgba(59,69,83,.18);
+    background:#fff;font-family:var(--ui);font-size:13px;padding:9px 11px;
+    color:var(--bench-ink);outline:none}
+  .devlist{overflow-y:auto;max-height:330px;padding:4px}
+  /* Разделитель этапа: подпись прижата к левому краю, линия добирает остаток */
+  .devgrp{display:flex;align-items:center;gap:7px;padding:9px 7px 5px}
+  .devgrp span{flex:none;font-family:var(--mono);font-size:9px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--faint)}
+  .devgrp:after{content:"";flex:1;height:1px;background:rgba(59,69,83,.14)}
+  .devitem{display:flex;align-items:center;gap:8px;width:100%;border:0;background:none;
+    border-radius:7px;padding:7px 8px;font-family:var(--ui);font-size:13px;
+    color:var(--bench-ink);cursor:pointer;text-align:left}
+  .devitem:hover{background:rgba(59,69,83,.08)}
+  .devitem[aria-selected=true]{background:var(--bench-ink);color:#fff}
+  .devempty{padding:12px 9px;font-size:12.5px;color:var(--faint)}
 
   /* дорожки задаём явно: у авторазмерной строки height:100% корпуса ссылается
      сам на себя, ссылка закольцовывается, и корпус вытягивается под контент */
@@ -115,13 +153,15 @@
 
   @media (max-width:860px){
     .bench{flex-direction:column}
-    .rail{width:auto;flex-direction:row;align-items:center;overflow-x:auto;overflow-y:hidden;
-      border-right:0;border-bottom:1px solid rgba(59,69,83,.2);padding:8px 10px;gap:8px}
-    .railtop,.railnote{display:none}
-    .railstates{flex-direction:row;gap:5px}
-    .chip{white-space:nowrap;border-radius:999px;padding:6px 11px}
-    .chip .n{display:none}
-    .railreset{white-space:nowrap;border-radius:999px}
+    /* На узком экране рельса - полоса сверху. Список раскрывается поверх
+       корпуса, иначе он оттолкнул бы телефон вниз и экран стало бы не видно. */
+    .rail{width:auto;flex:none;flex-direction:row;align-items:center;overflow:visible;
+      border-right:0;border-bottom:1px solid rgba(59,69,83,.2);
+      padding:9px 10px 9px 58px;gap:8px;
+      position:relative;z-index:50;background:rgba(255,255,255,.92)}
+    .railbody{flex:1;min-width:0}
+    .devmenu{position:absolute;left:10px;right:10px;top:calc(100% + 5px)}
+    .devlist{max-height:46vh}
     .stage{padding:8px}
   }
   @media (max-width:520px){
@@ -311,8 +351,12 @@
      баннером, и он читается как предложение, а не как требование. */
   /* Отступ карточки от краёв задан один раз переменной: на него же опирается
      градиент, и связь "сколько снизу - столько и сверху" держится сама. */
-  .consent{--cgap:11px;--cglow:40px;position:absolute;left:0;right:0;bottom:0;
-    z-index:25;padding:0 var(--cgap) var(--cgap);pointer-events:none}
+  /* z-index ниже оверлеев (у них 20): баннер принадлежит главному экрану, а
+     пауза, список игроков и форма отзыва лежат поверх всего. С большим
+     значением баннер перехватывал нажатия на кнопку отправки в форме отзыва
+     у того, кто ещё не ответил на вопрос про cookie. */
+  .consent{--cgap:11px;--cglow:80px;position:absolute;left:0;right:0;bottom:0;
+    z-index:15;padding:0 var(--cgap) var(--cgap);pointer-events:none}
   /* Градиент гасит контент над карточкой и уводит взгляд вниз. Тянется выше
      самой карточки, поэтому лежит в псевдоэлементе, а не в фоне. */
   /* Подложка баннера: сиреневый ореол, внизу плотный, вверху прозрачный.
@@ -323,8 +367,8 @@
   .consent:before{content:"";position:absolute;left:0;right:0;bottom:0;
     top:calc(-1 * var(--cglow));pointer-events:none;
     background:linear-gradient(180deg,
-      rgba(232,227,251,0) 0%, rgba(232,227,251,.45) 46%,
-      rgba(232,227,251,.82) 76%, rgba(232,227,251,1) 100%)}
+      rgba(214,204,250,0) 0%, rgba(214,204,250,.48) 46%,
+      rgba(214,204,250,.84) 76%, rgba(214,204,250,1) 100%)}
   .consent .cbox{position:relative;pointer-events:auto;
     background:var(--raise);border:1px solid var(--line);border-radius:16px;
     padding:13px 14px 11px;
@@ -357,9 +401,20 @@
   .survey .sthanks svg{width:17px;height:17px;flex:none}
   /* призыв спросить остальных: подсказка, а не призыв к действию кнопкой */
   .askothers{font-size:12px;line-height:1.4;color:var(--faint)}
-  .fbstatus{font-size:13px;min-height:18px}
+  /* Пустая строка статуса схлопывается совсем: display:none убирает её и из
+     раскладки флекса, поэтому зазор под полем не остаётся про запас. */
+  .fbstatus{font-size:13px}
+  .fbstatus:empty{display:none}
   .fbstatus.bad{color:var(--danger)}
   .fbstatus.ok{color:var(--ok)}
+  /* Экран после отправки: отзыв ушёл, но дверь остаётся открытой */
+  .fbdone{flex:1;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:11px;text-align:center;padding:22px 8px}
+  .fbdone .di{width:54px;height:54px;border-radius:50%;display:grid;
+    place-items:center;background:rgba(46,158,116,.12);color:var(--ok)}
+  .fbdone .di svg{width:27px;height:27px}
+  .fbdone .dt{font-size:19px;font-weight:700;letter-spacing:-.01em}
+  .fbdone p{max-width:260px}
   /* внешняя ссылка остаётся ссылкой: её можно скопировать и открыть в телеграме */
   .linkbtn{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;
     border:1px solid var(--accent);border-radius:11px;color:var(--accent);background:transparent;
@@ -409,7 +464,11 @@
   /* закрепляем только когда экран реально скроллится */
   .actions{margin-top:auto;padding:10px 0 2px;display:flex;flex-direction:column;gap:8px}
   .actions.stuck{position:sticky;bottom:0;z-index:5;background:var(--surface);
-    box-shadow:0 -10px 14px -10px rgba(20,24,32,.2)}
+    box-shadow:0 -10px 14px -10px rgba(20,24,32,.2);
+    transition:box-shadow .18s ease}
+  /* Докрутили до конца - под кнопкой ничего не спрятано, и тень врёт.
+     Кнопка встаёт как обычный элемент в потоке. */
+  .actions.stuck.atend{box-shadow:none}
   .kbopen .actions.stuck{position:static;box-shadow:none}
 
   .center{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;
@@ -604,7 +663,9 @@
   .histcard{background:var(--raise);border-radius:14px;padding:12px 13px;display:flex;flex-direction:column;gap:8px}
   .histrow{display:flex;align-items:center;gap:10px}
   .histrow .hb{flex:1;min-width:0}
-  .histcard .hd{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+  /* Дата набрана тем же шрифтом, что и всё вокруг: моноширинный здесь
+     читался как чужой, он нужен только там, где важно выравнивание цифр. */
+  .histcard .hd{font-size:11.5px;color:var(--faint)}
   .histcard .hw{font-size:15px;font-weight:700;letter-spacing:-.01em}
   .histcard .hp{font-size:13px;color:var(--muted);line-height:1.35}
   .cbtn{flex:none;width:38px;height:38px;border:0;border-radius:11px;cursor:pointer;
@@ -732,9 +793,9 @@ var TELEGRAM_URL = "https://t.me/gentlemad";
    docs/CHANGELOG.md. Отметку сборки к нему приклеивает build.js: по версии
    понятно, что человек видел, по дате - какая именно сборка у него открыта. */
 var VERSION = "0.6";
-var BUILD = "0.6 · 2026-09-21 12:34 UTC";
+var BUILD = "0.6 · 2026-09-21 17:37 UTC";
 var FB_STORE = "shlyapa.fb.v1";
-var FB_MIN = 5, FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
+var FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
 /* Счётчик символов висит на экране без дела: показываем, только когда
    до предела остаётся меньше этого запаса. */
 var FB_COUNT_FROM = 200;
@@ -748,7 +809,7 @@ var FB_FACES = [
 var FB_KINDS = ["Поломка", "Неудобство", "Предложение", "Впечатление"];
 /* Отзыв даёт тот, у кого в руках телефон, а играли все. Одна строка в двух
    местах, чтобы тексты не разъехались. */
-var FB_ASK_OTHERS = "\u2764\uFE0F Вы также можете спросить обратную связь у других игроков, отзывы всей компании важны";
+var FB_ASK_OTHERS = "Вы также можете спросить обратную связь у других игроков, отзывы всей компании важны \u2764\uFE0F";
 
 /* ---------- вопрос на финале ----------
    Появляется не с первой партии: после одной игры человеку нечего сравнивать,
@@ -760,7 +821,7 @@ var SURVEY_AFTER = 3;
    перекосится в негатив. Лица дают высказаться и довольным тоже. */
 var SURVEY_Q = "Как вам игра?";
 var svRate = 0, svText = "", svBusy = false;
-var fbRate = 0, fbKind = "", fbReach = false;
+var fbRate = 0, fbKind = "", fbReach = false, fbDone = false;
 
 /* ============================================================
    АНАЛИТИКА
@@ -779,6 +840,11 @@ var fbRate = 0, fbKind = "", fbReach = false;
 var EVENTS_URL = "https://shlyapa-feedback.grudanovartyom.workers.dev/e";
 var METRIKA_ID = 112813431;
 var AN_STORE = "shlyapa.an.v1";
+/* Сборка для обкатки (build.js --dev) ставит это в true. Она ходит по
+   экранам рельсой, и её прыжки не должны попадать ни в базу, ни в Метрику:
+   иначе разработка выглядела бы как самая активная компания в продукте.
+   Баннер при этом показывать надо - его же и смотрим. */
+var DEV_BUILD = false;
 /* Полным адресом, а не относительным: в артефакте прототипа относительный
    ссылается в пустоту, а страница политики живёт рядом с боевой сборкой. */
 var PRIVACY_URL = "https://gentlemad.github.io/shlyapa/privacy.html";
@@ -1208,22 +1274,49 @@ document.addEventListener("focusout", function(e){
 /* ============================================================
    РЕЛЬСА
    ============================================================ */
-var DEV_STATES = [
-  ["home","Главный экран"], ["rules","Правила"], ["stats","Статистика"],
-  ["setup-empty","Настройка пустая"], ["setup","Настройка"],
-  ["entry","Ввод слов"], ["entry-done","Ввод завершён"], ["roster","Список игроков"],
-  ["handoff","Передача"], ["turn","Ход"], ["boundary","Граница раунда"],
-  ["review","Итог хода"], ["round3","Финальный раунд"],
-  ["sheet","Пауза"], ["results","Финал"]
+/* Состояния разложены по этапам партии: так список читается сверху вниз
+   как сама игра, а не как перечень экранов в случайном порядке. */
+var DEV_GROUPS = [
+  ["Начало", [["home","Главный экран"], ["rules","Правила"], ["stats","Статистика"]]],
+  ["Подготовка", [["setup-empty","Настройка пустая"], ["setup","Настройка"],
+    ["entry","Ввод слов"], ["entry-done","Ввод завершён"], ["roster","Список игроков"]]],
+  ["Партия", [["handoff","Передача"], ["turn","Ход"], ["boundary","Граница раунда"],
+    ["review","Итог хода"], ["round3","Финальный раунд"], ["sheet","Пауза"]]],
+  ["Финал", [["results","Финал"], ["survey","Вопрос на финале"]]],
+  /* Экраны, до которых обычным путём идти долго: баннер показывается один раз
+     на устройство, вопрос на финале - только с третьей партии. */
+  ["Сбор данных", [["consent","Спросить про статистику заново"], ["feedback","Форма отзыва"]]]
 ];
+var DEV_STATES = DEV_GROUPS.reduce(function(a, g){ return a.concat(g[1]); }, []);
+var devOpen = false, devQuery = "";
+function devLabel(key){
+  for(var i=0;i<DEV_STATES.length;i++) if(DEV_STATES[i][0]===key) return DEV_STATES[i][1];
+  return key;
+}
 function renderDev(){
-  var host=byId("dev-chips"), sel=(S && S.devState)||"home";
-  if(!host) return;            // в чистой сборке рельсы нет
-  host.innerHTML = DEV_STATES.map(function(d,i){
-    return '<button class="chip" data-go="'+d[0]+'" aria-pressed="'+(d[0]===sel)+'">'+
-      '<span class="n">'+(i+1)+'</span>'+d[1]+'</button>';
-  }).join("");
-  host.querySelectorAll("[data-go]").forEach(function(b){ b.onclick=function(){ devJump(b.dataset.go); }; });
+  var list=byId("dev-list");
+  if(!list) return;            // в чистой сборке рельсы нет
+  var sel=(S && S.devState)||"home";
+
+  var cur=byId("dev-cur"); if(cur) cur.textContent = devLabel(sel);
+  var menu=byId("dev-menu"); if(menu) menu.hidden = !devOpen;
+  var trg=byId("dev-open"); if(trg) trg.setAttribute("aria-expanded", devOpen ? "true" : "false");
+
+  var q = devQuery.trim().toLowerCase();
+  var out = "";
+  DEV_GROUPS.forEach(function(g){
+    var items = g[1].filter(function(d){ return !q || d[1].toLowerCase().indexOf(q) >= 0; });
+    if(!items.length) return;
+    out += '<div class="devgrp"><span>'+esc(g[0])+'</span></div>';
+    out += items.map(function(d){
+      return '<button class="devitem" role="option" data-go="'+d[0]+'" '+
+        'aria-selected="'+(d[0]===sel)+'">'+esc(d[1])+'</button>';
+    }).join("");
+  });
+  list.innerHTML = out || '<div class="devempty">Ничего не найдено</div>';
+  list.querySelectorAll("[data-go]").forEach(function(b){
+    b.onclick = function(){ devOpen = false; devQuery = ""; devJump(b.dataset.go); };
+  });
 }
 function seedPlayers(k){ return SEED_NAMES.slice(0,k).map(function(n){ return {id:uid(), name:n}; }); }
 function seedWords(){
@@ -1263,10 +1356,26 @@ function simTurn(){
 }
 function devJump(target){
   stopTimer(); kbHide(); wakeOff();
-  byId("o-sheet").hidden=true; byId("o-flash").hidden=true; byId("o-roster").hidden=true;
+  /* Гасим все оверлеи, иначе открытый на прошлом состоянии повиснет поверх
+     нового. Добавили оверлей - добавьте и сюда. */
+  ["o-sheet","o-flash","o-roster","o-fb","o-consent"].forEach(function(id){
+    var el = byId(id); if(el) el.hidden = true;
+  });
   var keep = S ? S.settings : null;
 
   if(target==="home"){ S=freshState([],keep); S.devState="home"; go(); return; }
+
+  /* Согласие спрашивают один раз на устройство: чтобы увидеть баннер снова,
+     ответ надо стереть и поднять слой заново. */
+  if(target==="consent"){
+    try{ localStorage.removeItem(AN_STORE); }catch(e){}
+    AN.ok=null; AN.q=[]; AN.install=""; AN.sit=""; AN.phase="";
+    S=freshState([],keep); S.devState=target;
+    anInit(); go(); return;
+  }
+  if(target==="feedback"){
+    S=freshState([],keep); S.devState=target; go(); openFeedback(); return;
+  }
   if(target==="rules"||target==="stats"){ S=freshState([],keep); S.devState=target; S.phase=target; go(); return; }
   if(target==="setup-empty"){ S=freshState([],keep); S.devState=target; S.phase="setup"; go(); return; }
   if(target==="setup"){ S=freshState(SEED_NAMES.slice(0,5),keep); S.devState=target; S.phase="setup"; go(); return; }
@@ -1299,6 +1408,14 @@ function devJump(target){
   if(target==="round3"){ var g=0; while(S.round<3&&g++<400){ if(simTurn()) break; } S.phase="handoff"; go(); return; }
   if(target==="sheet"){ simTurn(); simTurn(); S.phase="handoff"; go(); openSheet("score"); return; }
   if(target==="results"){ var k2=0; while(k2++<600){ if(simTurn()) break; } finish(); return; }
+  /* Вопрос на финале включается с SURVEY_AFTER-й партии. Ставим счётчик на
+     одну меньше: finish() доведёт его до порога сам, как в живой игре. */
+  if(target==="survey"){
+    fbSet("games", String(Math.max(0, SURVEY_AFTER - 1)));
+    svRate = 0; svText = "";
+    var k3=0; while(k3++<600){ if(simTurn()) break; }
+    finish(); return;
+  }
 }
 
 /* ============================================================
@@ -1883,16 +2000,18 @@ function surveySend(){
   if(!svRate || svBusy) return;
   var note = (byId("sv-text") ? byId("sv-text").value : "").trim().slice(0, FB_MAX);
   var st = byId("sv-status");
-  /* Короткий обрывок молча не выбрасываем: воркер его всё равно отвергнет,
-     а человек решит, что отправилось. */
-  if(note && note.length < FB_MIN){
-    if(st){ st.className = "fbstatus bad"; st.textContent = "Слишком короткий текст"; }
-    return;
-  }
   svBusy = true;
   if(st){ st.className = "fbstatus"; st.textContent = "Отправляем..."; }
 
   track("survey_answered", {rate:svRate, comment:!!note, games:fbGames()});
+
+  if(DEV_BUILD){
+    setTimeout(function(){
+      svBusy = false; S._svSent = true; svRate = 0; svText = "";
+      buzz(12); save(); renderResults();
+    }, 350);
+    return;
+  }
 
   var ctrl = null, timer = null;
   try{ ctrl = new AbortController(); }catch(e){}
@@ -2001,6 +2120,7 @@ function shareGame(){
 }
 
 function openFeedback(){
+  fbDone = false;
   if(!fbAvailable()) return;
   kbHide();
   renderFeedback();
@@ -2025,6 +2145,24 @@ function fbCount(){
 
 function renderFeedback(){
   var inner = byId("fb-inner"), draft = fbGet("draft") || "", contact = fbGet("contact") || "";
+
+  if(fbDone){
+    inner.innerHTML =
+      '<div class="hdr"><div class="hside">' + hbtn("fb-close", IC.back, "Назад") + '</div>' +
+      '<div class="htitle">Обратная связь</div><div class="hside right"></div></div>' +
+      '<div class="sheetbody"><div class="fbdone">' +
+        '<div class="di">' + IC.check + '</div>' +
+        '<div class="dt">Спасибо, отзыв ушёл</div>' +
+        '<p>' + esc(FB_ASK_OTHERS) + '</p>' +
+      '</div></div>' +
+      '<div class="pad" style="flex:none;gap:10px">' +
+        '<ion-button id="fb-more" expand="block" fill="outline">Отправить ещё обратную связь</ion-button>' +
+      '</div>';
+    byId("fb-close").onclick = closeFeedback;
+    byId("fb-more").onclick = function(){ fbDone = false; renderFeedback(); };
+    return;
+  }
+
   var tg = fbTgOn()
     ? '<a class="linkbtn" id="fb-tg" href="' + esc(TELEGRAM_URL) + '" target="_blank" rel="noopener noreferrer">' +
         '<span class="tgi">' + IC.tg + '</span>Написать в телеграм</a>'
@@ -2045,8 +2183,11 @@ function renderFeedback(){
 
   var form = fbFormOn()
     ? rate + chips +
+      /* Статус живёт под полем: ошибка про текст должна стоять рядом с
+         текстом, а не у кнопки на другом конце экрана. */
       '<div><textarea class="tf ta tfwide" id="fb-text" maxlength="' + FB_MAX + '" ' +
         'placeholder="Расскажите своими словами"></textarea>' +
+        '<div class="fbstatus" id="fb-status"></div>' +
         '<div class="fbhint"><span></span><span id="fb-count"></span></div></div>' +
       '<div style="display:flex;flex-direction:column;gap:8px">' +
         '<button class="check" id="fb-reach" aria-pressed="' + fbReach + '">' +
@@ -2064,7 +2205,6 @@ function renderFeedback(){
     '<div class="htitle">Обратная связь</div><div class="hside right"></div></div>' +
     '<div class="sheetbody"><div class="pad" style="gap:14px">' + form + '</div></div>' +
     '<div class="pad" style="flex:none;gap:10px">' +
-      '<div class="fbstatus" id="fb-status"></div>' +
       (fbFormOn() ? '<div class="askothers">' + esc(FB_ASK_OTHERS) + '</div>' +
         '<ion-button id="fb-send" expand="block">Отправить</ion-button>' : "") +
       tg +
@@ -2118,7 +2258,8 @@ function sendFeedback(){
   /* Одной оценки или категории достаточно: человек не обязан ничего писать,
      чтобы сказать, что игра понравилась. */
   if(!text && !fbRate && !fbKind){ fbStatus("Поставьте оценку или напишите пару слов", "bad"); return; }
-  if(text && text.length < FB_MIN){ fbStatus("Слишком коротко", "bad"); try{ t.focus(); }catch(e){} return; }
+  /* Длину текста не проверяем: человек делится тем, чем хочет, и "тест"
+     или "ок" - тоже отзыв. Отсекать такое значит отсекать людей. */
 
   var last = +(fbGet("last") || 0);
   var wait = Math.ceil((FB_COOLDOWN_MS - (Date.now() - last)) / 1000);
@@ -2127,6 +2268,10 @@ function sendFeedback(){
   kbHide();
   b.disabled = true;
   fbStatus("Отправляем...");
+
+  /* Демо не шлёт ничего: воркер всё равно отказал бы чужому адресу, и человек
+     видел бы "не отправилось" там, где смотрят на вид экрана, а не на связь. */
+  if(DEV_BUILD){ setTimeout(fbSent, 350); return; }
 
   var ctrl = null, timer = null;
   try{ ctrl = new AbortController(); }catch(e){}
@@ -2162,8 +2307,10 @@ function fbSent(){
   fbDel("draft");
   fbRate = 0; fbKind = ""; fbReach = false;
   fbSet("contact", "");
+  /* Показываем благодарность вместо формы: строчка статуса под пустой формой
+     читалась как "ничего не произошло". Форму можно открыть снова кнопкой. */
+  fbDone = true;
   renderFeedback();
-  fbStatus("Спасибо, отзыв ушёл", "ok");
   buzz(12);
 }
 
@@ -2227,7 +2374,7 @@ function anStandalone(){
 }
 
 function track(name, props){
-  if(!anOn()) return;
+  if(!anOn() || DEV_BUILD) return;
   var e = {at: Date.now(), n: name, p: props || {}};
   if(AN.game) e.g = AN.game;
   AN.q.push(e);
@@ -2256,7 +2403,7 @@ function anSchedule(){
    Тип text/plain выбран намеренно - с application/json браузер сначала
    спросил бы разрешение отдельным запросом, а beacon так не умеет. */
 function anFlush(beacon){
-  if(!EVENTS_URL || !anOn() || !AN.q.length || AN.sending) return;
+  if(DEV_BUILD || !EVENTS_URL || !anOn() || !AN.q.length || AN.sending) return;
   var batch = AN.q.slice(0, AN_BATCH), n = batch.length;
   var body = JSON.stringify({
     install: AN.install, sit: AN.sit, build: BUILD,
@@ -2289,7 +2436,7 @@ function anFlush(beacon){
 }
 
 function anMetrika(){
-  if(!METRIKA_ID || window.ym) return;
+  if(DEV_BUILD || !METRIKA_ID || window.ym) return;
   try{
     (function(m,e,t,r,i,k,a){
       m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
@@ -2357,7 +2504,8 @@ function anAsk(){
 function anGate(){
   var el = byId("o-consent");
   if(!el) return;
-  var want = (AN.ok === null && S && S.phase === "home" && (EVENTS_URL || METRIKA_ID));
+  var want = (AN.ok === null && S && S.phase === "home" &&
+    (EVENTS_URL || METRIKA_ID || DEV_BUILD));
   if(want === !el.hidden) return;
   if(want){
     anAsk();
@@ -3109,7 +3257,11 @@ function renderResults(){
         '<span style="display:inline-flex;align-items:center;gap:8px">'+
         '<span style="width:17px;height:17px;display:block">'+IC.repeat+'</span>Сыграть тем же составом</span>'+
       '</ion-button>'+
-      (fbAvailable() ? fbLink("res-fb") : '')+
+      /* Когда на экране есть вопрос "Как вам игра?", отдельная ссылка на
+         обратную связь дублирует его. Ссылка остаётся только там, где
+         вопроса ещё нет: до третьей партии. */
+      ((fbAvailable() && !surveyOn() && !(S._svSent && fbGames() >= SURVEY_AFTER))
+        ? fbLink("res-fb") : '')+
       '</div>'+
     '</div>';
 
@@ -3135,11 +3287,16 @@ var SCREENS = {
   handoff:["s-handoff",renderHandoff], turn:["s-turn",renderTurn],
   review:["s-review",renderReview], results:["s-results",renderResults]
 };
+var stickyRaf = 0;
 function syncSticky(){
   document.querySelectorAll(".actions").forEach(function(a){
     var sc = a.closest(".screen, .sheetbody");
-    if(!sc){ a.classList.remove("stuck"); return; }
-    a.classList.toggle("stuck", sc.scrollHeight > sc.clientHeight + 2);
+    if(!sc){ a.classList.remove("stuck"); a.classList.remove("atend"); return; }
+    var scrolls = sc.scrollHeight > sc.clientHeight + 2;
+    a.classList.toggle("stuck", scrolls);
+    /* Докручено до низа: тень снимаем, прятать под кнопкой уже нечего */
+    a.classList.toggle("atend",
+      !scrolls || sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 2);
   });
 }
 window.addEventListener("resize", syncSticky);
@@ -3185,6 +3342,11 @@ function go(){
     thumb.style.opacity=1;
     clearTimeout(hide);
     hide=setTimeout(function(){ thumb.style.opacity=0; },700);
+    /* Тень под закреплённой кнопкой зависит от того, докручено ли до низа,
+       поэтому пересчитываем её здесь же, а не только на перерисовке. */
+    if(!stickyRaf) stickyRaf = requestAnimationFrame(function(){
+      stickyRaf = 0; syncSticky();
+    });
   },true);
 })();
 
@@ -3233,20 +3395,33 @@ function beep(){
 })();
 
 (function(){
-  var r = byId("dev-reset");
-  if(!r) return;
-  r.onclick = function(){ devJump((S&&S.devState)||"home"); };
-  /* Вторая кнопка рядом: вернуть вопрос про статистику. Отдельная, потому
-     что сброс состояния и сброс онбординга - разные намерения. */
-  var b = document.createElement("button");
-  b.className = "railreset";
-  b.textContent = "Спросить про статистику заново";
-  b.onclick = function(){
-    try{ localStorage.removeItem(AN_STORE); }catch(e){}
-    AN.ok = null; AN.q = []; AN.install = ""; AN.sit = "";
-    anInit(); anGate();
+  var open = byId("dev-open"), reset = byId("dev-reset"),
+      fold = byId("dev-fold"), search = byId("dev-search"), rail = byId("rail");
+  if(!open) return;            // в чистой сборке рельсы нет
+
+  open.onclick = function(){
+    devOpen = !devOpen;
+    renderDev();
+    if(devOpen && search){ search.value = devQuery; try{ search.focus(); }catch(e){} }
   };
-  r.parentNode.insertBefore(b, r.nextSibling);
+  reset.onclick = function(){ devJump((S && S.devState) || "home"); };
+  fold.onclick = function(){
+    var folded = rail.classList.toggle("folded");
+    fold.setAttribute("aria-expanded", folded ? "false" : "true");
+    fold.title = folded ? "Показать состояния" : "Скрыть состояния";
+    if(folded){ devOpen = false; renderDev(); }
+  };
+  search.oninput = function(){ devQuery = search.value; renderDev(); };
+  /* Esc закрывает список, клик мимо - тоже: открытый список поверх корпуса
+     иначе перекрывал бы телефон и мешал смотреть то, ради чего открывали. */
+  search.onkeydown = function(e){
+    if(e.key === "Escape"){ devOpen = false; devQuery = ""; search.value = ""; renderDev(); }
+  };
+  document.addEventListener("pointerdown", function(e){
+    if(!devOpen) return;
+    if(e.target.closest("#dev-menu") || e.target.closest("#dev-open")) return;
+    devOpen = false; renderDev();
+  });
 })();
 
 function boot(hot){
