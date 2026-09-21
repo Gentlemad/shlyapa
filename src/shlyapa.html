@@ -3463,17 +3463,18 @@ function beep(){
    Чего это стоит. Около тысячи точек на кадр при 30 кадрах в секунду.
    Дорогое здесь — не рисование, а склейка строк цвета, поэтому кисти
    посчитаны заранее (LUT), а точки одного оттенка рисуются одной заливкой. */
-var DOT_GRID = 20, DOT_R = 1.4, DOT_A = 0.11;   /* совпадает с точками до 0.9 */
+var DOT_GRID = 20;
+/* Точка вне светящегося пятна — такая же, какой была до 0.9. */
+var DOT_R = 1.4, DOT_A = 0.11;
+/* Точка в самой яркой части пятна. Задаётся абсолютными значениями, а не
+   прибавкой: так в одном месте видно, между чем и чем ходит точка. */
+var DOT_R_MAX = 1.8, DOT_A_MAX = 0.215;
+/* Масштаб самих пятен. 1 — те размеры, что заданы в DOT_KINDS. */
+var DOT_BLOB = 1;
 var DOT_RAMP = [[0, 90,169,247], [0.45, 31,111,235], [1, 122,90,245]];
 var DOT_POS = [0.45, 0, 1];              /* c: 0 синий, 1 голубой, 2 фиолетовый */
 var DOT_CN = 24, DOT_AN = 24;            /* дробность ленты и прозрачности */
 var DOT_SPEED = 1.7;
-/* Насколько точка меняется в самой яркой части пятна. Это две отдельные
-   величины, а не один «уровень»: размер и контраст утомляют по-разному.
-   DOT_PEAK_R - прибавка к радиусу в пикселях, DOT_PEAK_A - прибавка к
-   непрозрачности поверх базовых DOT_A. Фон не должен спорить с текстом,
-   поэтому обе прибавки держим скромными. */
-var DOT_PEAK_R = 0.42, DOT_PEAK_A = 0.105;
 var dotLUT = null;
 
 function dotRampAt(x){
@@ -3499,7 +3500,7 @@ function dotBuildLUT(){
     dotLUT[ci] = [];
     for(var ai=0; ai<DOT_AN; ai++){
       var f = (ai+0.5)/DOT_AN;
-      dotLUT[ci][ai] = "rgba("+col[0]+","+col[1]+","+col[2]+","+(DOT_A + DOT_PEAK_A*f).toFixed(3)+")";
+      dotLUT[ci][ai] = "rgba("+col[0]+","+col[1]+","+col[2]+","+(DOT_A + (DOT_A_MAX-DOT_A)*f).toFixed(3)+")";
     }
   }
 }
@@ -3590,12 +3591,12 @@ function dotFieldMake(canvas){
           /* расстояние до наклонной линии, которая едет поперёк экрана */
           var pos = ((time*bl.sp + bl.t) % 2.4 - 0.7) * w * 1.1;
           var d = Math.abs((dx - pos) * Math.cos(bl.ang) + dy * Math.sin(bl.ang));
-          var wd = bl.w * min * 1.6;
+          var wd = bl.w * min * 1.6 * DOT_BLOB;
           e = d < wd ? 1 - d/wd : 0;
           e = e*e;
         } else {
           var p = centre(bl, time);
-          var rr = bl.r * min;
+          var rr = bl.r * min * DOT_BLOB;
           if(bl.kind==="pulse") rr *= 0.72 + 0.42*(0.5+0.5*Math.sin(time*bl.sp*2 + bl.t));
           if(bl.kind==="blob"){
             /* форма перетекает: радиус зависит от направления на точку */
@@ -3639,7 +3640,7 @@ function dotFieldMake(canvas){
       var kc = (kk/DOT_AN)|0, ka = kk % DOT_AN;
       var f = (ka+0.5)/DOT_AN;
       ctx.fillStyle = dotLUT[kc][ka];
-      var rad = DOT_R + DOT_PEAK_R*f;
+      var rad = DOT_R + (DOT_R_MAX-DOT_R)*f;
       ctx.beginPath();
       for(var m=0;m<arr.length;m+=2){
         ctx.moveTo(arr[m]+rad, arr[m+1]);
