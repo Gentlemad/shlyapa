@@ -242,17 +242,13 @@
      неудобно, и об этом честнее сказать сразу. */
   .deskwall{position:fixed;inset:0;z-index:90;background:var(--paper);
     display:flex;flex-direction:column;align-items:center;justify-content:center;
-    text-align:center;padding:32px 24px;gap:0}
-  .deskwall .dwico{width:84px;height:84px;color:var(--accent);margin-bottom:22px}
-  .deskwall .dwico svg{width:84px;height:84px}
-  .deskwall h1{margin:0 0 12px;font-size:30px;letter-spacing:-.02em;text-wrap:balance;max-width:18ch}
-  .deskwall p{margin:0 0 10px;font-size:15.5px;color:var(--muted);max-width:46ch;line-height:1.55}
-  .deskwall .dwurl{margin:26px 0 0;font-size:14px;color:var(--faint)}
-  .deskwall .dwurl b{display:block;margin-top:5px;font-family:var(--mono);font-size:15px;
-    color:var(--ink);font-weight:400;word-break:break-all}
-  .deskwall .dwgo{margin-top:30px;border:0;background:none;color:var(--accent);
-    font:inherit;font-size:14px;font-weight:600;cursor:pointer;padding:10px 14px;border-radius:10px}
-  .deskwall .dwgo:hover{background:var(--accent-soft)}
+    text-align:center;padding:32px 24px}
+  .deskwall h1{margin:0 0 14px;font-size:29px;letter-spacing:-.02em;text-wrap:balance;max-width:19ch}
+  .deskwall p{margin:0;font-size:16px;color:var(--muted);max-width:44ch;line-height:1.55;text-wrap:pretty}
+  .deskwall .dwgo{margin-top:30px;border:1px solid var(--line-strong);background:var(--raise);
+    color:var(--ink);font:inherit;font-size:14.5px;font-weight:600;cursor:pointer;
+    padding:12px 22px;border-radius:12px}
+  .deskwall .dwgo:hover{border-color:var(--accent);color:var(--accent)}
 
   /* уголок над геро: кнопка не должна спорить с логотипом за внимание */
   .topright{display:flex;justify-content:flex-end;margin-bottom:-6px}
@@ -1577,13 +1573,9 @@ function paintDeskWall(){
   el.className = "deskwall";
   el.id = "deskwall";
   el.innerHTML =
-    '<div class="dwico">'+IC.phone+'</div>'+
-    '<h1>Шляпа сделана для телефона</h1>'+
-    '<p>Партия идёт на одном устройстве, которое игроки передают друг другу по '+
-    'кругу: объясняющий держит его в руках и прячет слово от соседа. С мышью '+
-    'по кругу так не получится.</p>'+
-    '<p>Откройте эту же ссылку на телефоне — и зовите компанию.</p>'+
-    '<div class="dwurl">Адрес игры<b>'+esc(location.origin + location.pathname)+'</b></div>'+
+    '<h1>Игра Шляпа сделана для мобильных устройств</h1>'+
+    '<p>Поскольку каждый ход устройство передаётся между игроками, играть удобнее '+
+    'на телефоне или планшете. Рекомендуем открыть игру с телефона.</p>'+
     '<button class="dwgo" id="dw-go">Всё равно открыть на компьютере</button>';
   document.body.appendChild(el);
   byId("dw-go").onclick = function(){ fbSet("deskwall","off"); el.remove(); };
