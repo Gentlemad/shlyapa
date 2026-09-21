@@ -247,18 +247,22 @@
   .tfwide{width:100%;display:block;flex:none}
   .fbhint{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--faint)}
   /* оценка: пять лиц, невыбранные приглушены, чтобы выбранное читалось сразу */
-  /* Записка для тех, кто открыл игру не с телефона. Тон мягкий: это
-     подсказка, а не препятствие - на компьютере всё работает. */
-  .desknote{display:flex;gap:10px;align-items:flex-start;
-    background:var(--raise);border:1px solid var(--line);border-radius:13px;
-    padding:11px 13px;font-size:13px;line-height:1.45;color:var(--muted)}
-  .desknote .di{flex:none;width:19px;height:19px;color:var(--accent);margin-top:1px}
-  .desknote .di svg{width:19px;height:19px}
-  .desknote .dt{flex:1;min-width:0}
-  .desknote .dt b{color:var(--ink);font-weight:600}
-  .desknote .dx{flex:none;width:26px;height:26px;display:grid;place-items:center;
-    border:0;background:none;color:var(--faint);cursor:pointer;border-radius:8px;padding:0;margin:-3px -4px 0 0}
-  .desknote .dx svg{width:15px;height:15px}
+  /* Экран для тех, кто открыл игру не с телефона. Занимает всё окно, но не
+     запирает: игра на компьютере работает, просто передавать мышь по кругу
+     неудобно, и об этом честнее сказать сразу. */
+  .deskwall{position:fixed;inset:0;z-index:90;background:var(--paper);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:32px 24px;gap:0}
+  .deskwall .dwico{width:84px;height:84px;color:var(--accent);margin-bottom:22px}
+  .deskwall .dwico svg{width:84px;height:84px}
+  .deskwall h1{margin:0 0 12px;font-size:30px;letter-spacing:-.02em;text-wrap:balance;max-width:18ch}
+  .deskwall p{margin:0 0 10px;font-size:15.5px;color:var(--muted);max-width:46ch;line-height:1.55}
+  .deskwall .dwurl{margin:26px 0 0;font-size:14px;color:var(--faint)}
+  .deskwall .dwurl b{display:block;margin-top:5px;font-family:var(--mono);font-size:15px;
+    color:var(--ink);font-weight:400;word-break:break-all}
+  .deskwall .dwgo{margin-top:30px;border:0;background:none;color:var(--accent);
+    font:inherit;font-size:14px;font-weight:600;cursor:pointer;padding:10px 14px;border-radius:10px}
+  .deskwall .dwgo:hover{background:var(--accent-soft)}
 
   /* уголок над геро: кнопка не должна спорить с логотипом за внимание */
   .topright{display:flex;justify-content:flex-end;margin-bottom:-6px}
@@ -856,7 +860,7 @@ var TELEGRAM_URL = "https://t.me/gentlemad";
    docs/CHANGELOG.md. Отметку сборки к нему приклеивает build.js: по версии
    понятно, что человек видел, по дате - какая именно сборка у него открыта. */
 var VERSION = "0.7";
-var BUILD = "0.7 · 2026-09-21 06:56 UTC";
+var BUILD = "0.7 · 2026-09-21 08:20 UTC";
 var FB_STORE = "shlyapa.fb.v1";
 var FB_MIN = 5, FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
 /* Счётчик символов висит на экране без дела: показываем, только когда
@@ -1562,22 +1566,37 @@ function replayFrom(g){
 function onDesktop(){
   try{ return window.matchMedia("(hover:hover) and (pointer:fine)").matches; }catch(e){ return false; }
 }
-function deskNoteHidden(){ return fbGet("desknote") === "off"; }
+function deskWallOff(){ return fbGet("deskwall") === "off"; }
+
+/* Стена показывается поверх всего, а не внутри экрана: она не про главный
+   экран, а про устройство целиком. */
+function paintDeskWall(){
+  var old = byId("deskwall");
+  if(old) old.remove();
+  if(!onDesktop() || deskWallOff()) return;
+  var el = document.createElement("div");
+  el.className = "deskwall";
+  el.id = "deskwall";
+  el.innerHTML =
+    '<div class="dwico">'+IC.phone+'</div>'+
+    '<h1>Шляпа сделана для телефона</h1>'+
+    '<p>Партия идёт на одном устройстве, которое игроки передают друг другу по '+
+    'кругу: объясняющий держит его в руках и прячет слово от соседа. С мышью '+
+    'по кругу так не получится.</p>'+
+    '<p>Откройте эту же ссылку на телефоне — и зовите компанию.</p>'+
+    '<div class="dwurl">Адрес игры<b>'+esc(location.origin + location.pathname)+'</b></div>'+
+    '<button class="dwgo" id="dw-go">Всё равно открыть на компьютере</button>';
+  document.body.appendChild(el);
+  byId("dw-go").onclick = function(){ fbSet("deskwall","off"); el.remove(); };
+}
 
 function renderHome(){
   var el=byId("s-home"), hist=loadHist(), last=hist[0];
-  var desk = onDesktop() && !deskNoteHidden();
   var win = last && last.scores && last.scores.length ? last.scores[0] : null;
 
   el.innerHTML =
     '<div class="pad" style="gap:14px">'+
       '<div class="topright">'+hbtn2("h-share", IC.share, "Поделиться игрой")+'</div>'+
-      (desk ? '<div class="desknote">'+
-        '<span class="di">'+IC.phone+'</span>'+
-        '<span class="dt"><b>Лучше открыть с телефона.</b> Игра идёт на одном '+
-        'устройстве, которое передают по кругу: телефон удобно держать в руке '+
-        'и прятать слово от соседа. С компьютера всё работает, но играть менее удобно.</span>'+
-        '<button class="dx" id="h-deskx" aria-label="Скрыть">'+IC.close+'</button></div>' : '')+
       '<div class="hero">'+
         '<div class="hatstack" id="hatstack"></div>'+
         '<h1>Шляпа</h1>'+
@@ -1603,8 +1622,6 @@ function renderHome(){
 
   mountHats();
   byId("h-share").onclick=shareGame;
-  var dx=byId("h-deskx");
-  if(dx) dx.onclick=function(){ fbSet("desknote","off"); go(); };
   byId("h-new").onclick=function(){ S.phase="setup"; go(); };
   byId("h-rules").onclick=function(){
     S.phase="rules";
@@ -3366,6 +3383,7 @@ function beep(){
 })();
 
 function boot(hot){
+  paintDeskWall();
   anInit();
   var restored=(hot&&hot.S)||loadCur();
   if(restored && restored.phase && ["home","setup","results","rules","stats"].indexOf(restored.phase)<0){
