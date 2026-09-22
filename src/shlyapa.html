@@ -1914,6 +1914,12 @@ function renderStats(){
               (t.fastest ? titleBlock("green", IC.bolt, "Скорострел", t.fastest.v, t.fastest.d) : "")+
             '</div>'
           : '')+
+        /* Радар строится по сохранённым очкам той партии. У старых записей
+           players может не быть - тогда раздел просто не показывается. */
+        (g.players && g.players.length>=3 && g.scores
+          ? '<div class="radarwrap"><div class="sechead">Итоговый расклад</div>'+
+              radarSVG(g.players, g.scores)+'</div>'
+          : '')+
         '<div class="spacer"></div>'+
         '<div class="actions"><ion-button id="st-replay" expand="block">Повторить этим составом</ion-button></div>'+
       '</div>';
@@ -2974,10 +2980,13 @@ function endTurn(){
   go();
 }
 
-function radarSVG(){
-  var order=S.players, n=order.length;
+/* Без аргументов рисует текущую партию, с ними - сохранённую из истории.
+   В записи истории лежат и players, и scores в том же виде, что у живой
+   партии, поэтому второй разметки не нужно. */
+function radarSVG(players, pts){
+  var order=players||S.players, n=order.length;
   if(n<3) return "";
-  var m={}; scores().forEach(function(s){ m[s.id]=s.pts; });
+  var m={}; (pts||scores()).forEach(function(s){ m[s.id]=s.pts; });
   var max=Math.max(1, Math.max.apply(null, order.map(function(p){ return m[p.id]||0; })));
   var W=250,H=210,cx=W/2,cy=H/2+4,R=62,parts=[],labels=[];
   function pt(i,f){ var a=-Math.PI/2+i*(2*Math.PI/n); return [cx+Math.cos(a)*R*f, cy+Math.sin(a)*R*f]; }
