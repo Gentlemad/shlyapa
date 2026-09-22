@@ -1,0 +1,1106 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="description" content="Подбор покраски, материала, света и движения объёмного значка «Шляпы»">
+<title>Мастерская шляп</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  :root{
+    color-scheme: light;
+    --bg:#F2F0F8; --panel:#FBFAFE; --raise:#FFFFFF;
+    --ink:#1A1822; --muted:#63607A; --faint:#918DA8;
+    --line:#DCD8EA; --line2:#C5BFDC;
+    --accent:#6B4BE8; --accent-soft:rgba(107,75,232,.12);
+    --stage:#EDF1F7; --stage2:#E6E4F2;
+    --ui:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --bg:#141320; --panel:#1C1A2B; --raise:#232038;
+      --ink:#EEECF6; --muted:#A5A0BE; --faint:#736E8E;
+      --line:#2E2B45; --line2:#413C5F;
+      --accent:#9B81FF; --accent-soft:rgba(155,129,255,.16);
+      --stage:#1B1A28; --stage2:#221F34;
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --bg:#141320; --panel:#1C1A2B; --raise:#232038;
+    --ink:#EEECF6; --muted:#A5A0BE; --faint:#736E8E;
+    --line:#2E2B45; --line2:#413C5F;
+    --accent:#9B81FF; --accent-soft:rgba(155,129,255,.16);
+    --stage:#1B1A28; --stage2:#221F34;
+  }
+
+  html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--ui);
+    font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  *{box-sizing:border-box}
+  .wrap{max-width:1180px;margin:0 auto;padding-inline:16px;padding-block:18px 56px}
+
+  header{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 14px;margin-bottom:16px}
+  h1{font-size:23px;font-weight:700;letter-spacing:-.02em;margin:0;text-wrap:balance}
+  header p{margin:0;color:var(--muted);font-size:13.5px;max-width:58ch}
+
+  .cols{display:grid;grid-template-columns:1fr;gap:16px}
+  /* без этого колонка раздувается до min-content вывода и уезжает за экран */
+  .cols > *{min-width:0}
+  @media (min-width:900px){ .cols{grid-template-columns:minmax(0,420px) minmax(0,1fr)} }
+
+  /* ---- сцена ---- */
+  .stagecol{display:flex;flex-direction:column;gap:12px}
+  @media (min-width:900px){ .stagecol{position:sticky;top:12px;align-self:start} }
+  .stage{position:relative;border-radius:18px;overflow:hidden;
+    background:radial-gradient(120% 95% at 50% 8%,var(--stage) 0%,var(--stage2) 100%);
+    aspect-ratio:1/1;max-width:100%}
+  .stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .stage .shade{position:absolute;left:50%;bottom:13%;width:46%;height:5%;
+    transform:translateX(-50%);border-radius:50%;pointer-events:none;
+    background:radial-gradient(ellipse at center,rgba(50,36,110,.30) 0%,
+      rgba(50,36,110,.13) 45%,rgba(50,36,110,0) 72%)}
+  .stage .nm{position:absolute;left:14px;bottom:12px;font-size:12px;color:var(--faint);
+    letter-spacing:.03em;text-transform:uppercase;pointer-events:none}
+
+  .sidebyside{display:flex;gap:12px;align-items:flex-end}
+  .real{position:relative;width:148px;height:148px;flex:none;border-radius:14px;
+    overflow:hidden;background:var(--stage)}
+  .real canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .real .shade{position:absolute;left:50%;bottom:11px;width:50%;height:9px;
+    transform:translateX(-50%);border-radius:50%;pointer-events:none;
+    background:radial-gradient(ellipse at center,rgba(50,36,110,.26) 0%,
+      rgba(50,36,110,.12) 45%,rgba(50,36,110,0) 72%)}
+  .realnote{font-size:12px;color:var(--muted);line-height:1.35}
+
+  .picks{display:flex;flex-wrap:wrap;gap:6px}
+  .pick{border:1px solid var(--line);background:var(--panel);color:var(--muted);
+    border-radius:999px;padding:5px 11px;font:inherit;font-size:12.5px;cursor:pointer;
+    font-weight:500}
+  .pick:hover{border-color:var(--line2);color:var(--ink)}
+  .pick[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+  .pick:focus-visible,.btn:focus-visible,.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  /* ---- панель ---- */
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+    padding:14px 15px}
+  .panel + .panel{margin-top:12px}
+  .panel h2{margin:0 0 2px;font-size:12px;font-weight:700;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--faint)}
+  .panel .sub{margin:0 0 12px;font-size:12.5px;color:var(--muted)}
+  .grid2{display:grid;grid-template-columns:1fr;gap:13px 20px}
+  @media (min-width:560px){ .grid2{grid-template-columns:1fr 1fr} }
+
+  .ctrl{display:flex;flex-direction:column;gap:3px;min-width:0}
+  .ctrl .lab{display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+    font-size:12.5px;color:var(--muted)}
+  .ctrl .val{font-family:var(--mono);font-size:11.5px;color:var(--ink);
+    font-variant-numeric:tabular-nums;white-space:nowrap}
+
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:22px;
+    margin:0;background:transparent;cursor:pointer}
+  input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;
+    background:var(--line2)}
+  input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(--line2)}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+    width:16px;height:16px;border-radius:50%;background:var(--accent);
+    border:2px solid var(--raise);margin-top:-6px;
+    box-shadow:0 1px 3px rgba(26,24,34,.28)}
+  input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;
+    background:var(--accent);border:2px solid var(--raise);
+    box-shadow:0 1px 3px rgba(26,24,34,.28)}
+
+  /* два значения на одной дорожке: нижнее и верхнее */
+  .dual{position:relative;height:22px}
+  .dual .tr{position:absolute;left:0;right:0;top:9px;height:4px;border-radius:2px;
+    background:var(--line2)}
+  .dual .fl{position:absolute;top:9px;height:4px;border-radius:2px;background:var(--accent)}
+  .dual input[type=range]{position:absolute;inset:0;pointer-events:none}
+  .dual input[type=range]::-webkit-slider-runnable-track{background:transparent}
+  .dual input[type=range]::-moz-range-track{background:transparent}
+  .dual input[type=range]::-webkit-slider-thumb{pointer-events:auto}
+  .dual input[type=range]::-moz-range-thumb{pointer-events:auto}
+
+  .seg{display:flex;gap:5px;flex-wrap:wrap}
+  .seg button{flex:1;min-width:88px;border:1px solid var(--line);background:var(--raise);
+    color:var(--muted);border-radius:10px;padding:7px 8px;font:inherit;font-size:12.5px;
+    cursor:pointer;font-weight:500}
+  .seg button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);
+    color:var(--accent);font-weight:600}
+
+  .swatches{display:flex;gap:4px;margin-top:8px}
+  .sw{flex:1;height:26px;border-radius:7px;border:1px solid var(--line)}
+
+  .foot{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center}
+  .btn{border:1px solid var(--line2);background:var(--raise);color:var(--ink);
+    border-radius:10px;padding:8px 14px;font:inherit;font-size:13.5px;cursor:pointer;
+    font-weight:600}
+  .btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn:hover{border-color:var(--accent)}
+  .said{font-size:12.5px;color:var(--muted)}
+  pre.out{margin:12px 0 0;background:var(--raise);border:1px solid var(--line);
+    border-radius:12px;padding:11px 12px;font-family:var(--mono);font-size:11.5px;
+    line-height:1.55;color:var(--ink);overflow-x:auto;max-width:100%;max-height:230px}
+  .nogl{padding:20px;text-align:center;color:var(--muted);font-size:13.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Мастерская шляп</h1>
+    <p>Подбор объёмного значка для главного экрана «Шляпы». Крутите ползунки,
+       выбранное внизу превращается в набор чисел для переноса в приложение.</p>
+  </header>
+
+  <div class="cols">
+    <div class="stagecol">
+      <div class="stage" id="stage">
+        <div class="shade"></div>
+        <canvas id="big"></canvas>
+        <div class="nm" id="nm">цилиндр</div>
+      </div>
+
+      <div class="picks" id="picks"></div>
+
+      <div class="sidebyside">
+        <div class="real">
+          <div class="shade"></div>
+          <canvas id="small"></canvas>
+        </div>
+        <div class="realnote">Слева — настоящий размер значка
+          на главном экране, 148&nbsp;px. Всё, что не читается здесь,
+          не прочитается и в игре.</div>
+      </div>
+    </div>
+
+    <div>
+      <section class="panel">
+        <h2>Покраска</h2>
+        <p class="sub">Гамма задаётся отрезком на цветовом круге: от синего
+           через фиолетовый к красному. Каждый убор берёт свой оттенок внутри
+           этого отрезка.</p>
+        <div class="grid2" id="gColor"></div>
+        <div class="swatches" id="swatches"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Материал и свет</h2>
+        <p class="sub">Готовые наборы — отправная точка, дальше правьте по вкусу.</p>
+        <div class="seg" id="presets"></div>
+        <div class="grid2" id="gMat" style="margin-top:12px"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Движение</h2>
+        <p class="sub">Разброс скоростей и качания даёт уборам разный характер:
+           при одинаковых значениях все вращаются механически одинаково.</p>
+        <div class="grid2" id="gAnim"></div>
+        <div style="margin-top:12px">
+          <div class="lab" style="font-size:12.5px;color:var(--muted);margin-bottom:5px">Смена убора</div>
+          <div class="seg" id="trans"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Камера</h2>
+        <p class="sub">Длинный объектив сохраняет пропорции, короткий добавляет перспективы.</p>
+        <div class="grid2" id="gCam"></div>
+      </section>
+
+      <div class="foot">
+        <button class="btn pri" id="copy" type="button">Скопировать настройки</button>
+        <button class="btn" id="reset" type="button">Вернуть исходные</button>
+        <button class="btn" id="play" type="button" hidden>Запустить движение</button>
+        <span class="said" id="said"></span>
+      </div>
+      <pre class="out" id="out"></pre>
+    </div>
+  </div>
+</div>
+
+<script>/* Шейдер объёмных головных уборов.
+
+   Каждый убор - функция расстояния. Возвращает два числа: расстояние до
+   тела и расстояние до мелкой детали (лента, помпон, кисточка). Детали
+   считаются врозь, потому что на время перетекания их надо прятать.
+
+   Живёт отдельным файлом только в мастерской: в приложение уезжает строкой. */
+window.HAT_FRAG = `
+precision highp float;
+uniform vec2  uRes;
+uniform float uTime;
+uniform float uSpin;
+uniform float uTiltX;
+uniform float uTiltZ;
+uniform float uA;
+uniform float uB;
+uniform float uMix;
+uniform float uScale;
+uniform float uOffY;
+uniform vec3  uTopA;
+uniform vec3  uBotA;
+uniform vec3  uAccA;
+uniform vec3  uTopB;
+uniform vec3  uBotB;
+uniform vec3  uAccB;
+uniform float uRough;
+uniform float uEnv;
+uniform float uRim;
+uniform float uKeyAz;
+uniform float uKeyEl;
+uniform float uKeyPow;
+uniform float uCamEl;
+uniform float uFocal;
+#define PI 3.14159265
+
+mat2 rot(float a){ float c=cos(a), s=sin(a); return mat2(c,-s,s,c); }
+float smin(float a,float b,float k){ float h=clamp(0.5+0.5*(b-a)/k,0.0,1.0); return mix(b,a,h)-k*h*(1.0-h); }
+float smax(float a,float b,float k){ return -smin(-a,-b,k); }
+
+float sdSphere(vec3 p,float r){ return length(p)-r; }
+float sdRoundCyl(vec3 p,float r,float h,float rb){
+  vec2 d=vec2(length(p.xz)-(r-rb), abs(p.y)-(h-rb));
+  return min(max(d.x,d.y),0.0)+length(max(d,0.0))-rb;
+}
+float sdRoundCone(vec3 p,float r1,float r2,float h){
+  vec2 q=vec2(length(p.xz),p.y);
+  float b=(r1-r2)/h;
+  float a=sqrt(max(1.0-b*b,0.0));
+  float k=dot(q,vec2(-b,a));
+  if(k<0.0) return length(q)-r1;
+  if(k>a*h) return length(q-vec2(0.0,h))-r2;
+  return dot(q,vec2(a,b))-r1;
+}
+float sdEllipsoid(vec3 p,vec3 r){
+  float k0=length(p/r); float k1=length(p/(r*r));
+  return k0*(k0-1.0)/max(k1,1e-5);
+}
+float sdTorus(vec3 p,vec2 t){ vec2 q=vec2(length(p.xz)-t.x,p.y); return length(q)-t.y; }
+float sdCapsule(vec3 p,vec3 a,vec3 b,float r){
+  vec3 pa=p-a, ba=b-a;
+  float h=clamp(dot(pa,ba)/dot(ba,ba),0.0,1.0);
+  return length(pa-ba*h)-r;
+}
+
+/* Поля почти у всех уборов - диск с подвёрнутым краем. Одна деталь на всех. */
+float brimOf(vec3 p,float rad,float thick,float curl,float front){
+  vec3 b=p;
+  float rr=clamp(length(p.xz)/rad,0.0,1.0);
+  b.y-=curl*rr*rr;
+  /* спереди поле опущено, сзади поднято: так шляпа перестаёт быть тарелкой */
+  b.y+=front*rr*rr*clamp(p.z/rad,-1.0,1.0);
+  return sdRoundCyl(b-vec3(0.0,0.03,0.0),rad,thick,thick*0.9);
+}
+
+/* ---------- 0. цилиндр ---------- */
+vec2 hatTop(vec3 p){
+  vec3 q=p; q.xz/=(1.0+0.055*p.y);
+  float crown=sdRoundCyl(q-vec3(0.0,0.62,0.0),0.50,0.56,0.075)*0.94;
+  float brim=brimOf(p,0.94,0.042,0.06,0.0);
+  float body=smin(crown,brim,0.05);
+  float band=sdRoundCyl(p-vec3(0.0,0.18,0.0),0.536,0.085,0.028);
+  return vec2(body,band);
+}
+
+/* ---------- 1. распределяющая ----------
+   Ось загнута вперёд, по конусу идут складки: без них это просто колпак. */
+vec2 hatSorting(vec3 p){
+  vec3 q=p;
+  float t=clamp(q.y/1.68,0.0,1.0);
+  q.x-=0.46*t*t*t;
+  q.xz*=rot(0.55*t*t);
+  q.xz/=(1.0-0.12*sin(PI*t));
+  float cone=sdRoundCone(q-vec3(0.0,0.02,0.0),0.58,0.045,1.66);
+  float ang=atan(q.z,q.x);
+  float fold=0.040*sin(5.0*ang+4.2*t)*smoothstep(0.08,0.45,t)
+            +0.022*sin(9.0*t+1.7)*smoothstep(0.15,0.6,t);
+  cone=(cone-fold)*0.70;
+  cone=smax(cone,-(p.y-0.012),0.03);
+  float brim=brimOf(p,0.92,0.050,0.09,0.0);
+  float body=smin(cone,brim,0.11);
+  /* складка-«рот» вырезана в поверхности, а не приставлена к ней */
+  float mouth=sdCapsule(p,vec3(-0.30,0.44,0.40),vec3(0.26,0.38,0.42),0.070);
+  body=smax(body,-mouth,0.045);
+  return vec2(body,1e5);
+}
+
+/* ---------- 2. федора ----------
+   Вмятина вдоль тульи и два защипа спереди - вычитаются из купола. */
+vec2 hatFedora(vec3 p){
+  float crown=sdRoundCyl(p-vec3(0.0,0.36,0.0),0.470,0.345,0.115);
+  float crease=sdCapsule(p,vec3(0.0,0.735,-0.34),vec3(0.0,0.735,0.38),0.135);
+  crown=smax(crown,-crease,0.05);
+  float pinchL=sdSphere(p-vec3(-0.37,0.585,0.20),0.150);
+  float pinchR=sdSphere(p-vec3( 0.37,0.585,0.20),0.150);
+  crown=smax(crown,-pinchL,0.045);
+  crown=smax(crown,-pinchR,0.045);
+  float brim=brimOf(p,1.02,0.038,0.105,-0.21);
+  float body=smin(crown,brim,0.06);
+  float band=sdRoundCyl(p-vec3(0.0,0.155,0.0),0.505,0.085,0.028);
+  return vec2(body,band);
+}
+
+/* ---------- 3. порк-пай ----------
+   Низкая тулья с плоским верхом и кольцевой канавкой по краю. */
+vec2 hatPorkPie(vec3 p){
+  float crown=sdRoundCyl(p-vec3(0.0,0.29,0.0),0.465,0.29,0.055);
+  float groove=sdTorus(p-vec3(0.0,0.575,0.0),vec2(0.385,0.070));
+  crown=smax(crown,-groove,0.028);
+  float brim=brimOf(p,0.90,0.040,0.145,0.0);
+  float body=smin(crown,brim,0.045);
+  float band=sdRoundCyl(p-vec3(0.0,0.135,0.0),0.498,0.072,0.026);
+  return vec2(body,band);
+}
+
+/* ---------- 4. deerstalker ----------
+   Купол со швом, два козырька и прижатые по бокам уши. */
+vec2 hatDeer(vec3 p){
+  vec3 q=p; q.y/=0.88;
+  float dome=sdEllipsoid(q-vec3(0.0,0.11,0.0),vec3(0.555,0.455,0.565))*0.88;
+  vec3 vf=p-vec3(0.0,0.095,0.545); vf.y+=0.11*clamp((p.z-0.20)/0.52,0.0,1.0);
+  float peakF=sdEllipsoid(vf,vec3(0.505,0.072,0.305));
+  vec3 vb=p-vec3(0.0,0.095,-0.545); vb.y+=0.11*clamp((-p.z-0.20)/0.52,0.0,1.0);
+  float peakB=sdEllipsoid(vb,vec3(0.505,0.072,0.305));
+  /* уши прижаты вплотную: отставленные читаются как крылья */
+  float earL=sdEllipsoid(p-vec3(-0.405,0.205,0.0),vec3(0.072,0.150,0.245));
+  float earR=sdEllipsoid(p-vec3( 0.405,0.205,0.0),vec3(0.072,0.150,0.245));
+  float body=smin(smin(dome,peakF,0.055),peakB,0.055);
+  body=smin(smin(body,earL,0.125),earR,0.125);
+  /* шов - канавка по макушке, а не приставленная палка */
+  float seam=sdCapsule(p,vec3(0.0,0.64,-0.30),vec3(0.0,0.64,0.30),0.042);
+  body=smax(body,-seam,0.028);
+  float knot=sdTorus(p-vec3(0.0,0.565,0.0),vec2(0.060,0.026));
+  return vec2(body,knot);
+}
+
+/* ---------- 5. кепи «острых козырьков» ----------
+   Плоская восьмиклинка: приплюснутый купол, свисающий вперёд, и короткий
+   жёсткий козырёк. Клинья - радиальные канавки на верху. */
+vec2 hatFlatCap(vec3 p){
+  vec3 q=p;
+  q.yz*=rot(-0.215);
+  /* купол из двух частей: сзади выше, спереди свисает на козырёк.
+     Один ровный эллипсоид читается беретом, «таблетка» - лепёшкой. */
+  float back=sdEllipsoid(q-vec3(0.0,0.300,-0.090),vec3(0.545,0.285,0.505));
+  float front=sdEllipsoid(q-vec3(0.0,0.215,0.285),vec3(0.510,0.160,0.440));
+  float dome=smin(back,front,0.13);
+  dome=smax(dome,-(q.y-0.045),0.055);
+  float ang=atan(q.z,q.x);
+  float panel=0.022*sin(4.0*ang)*smoothstep(0.33,0.52,q.y);
+  dome-=panel;
+  /* козырёк вынесен дальше вперёд: иначе купол его съедает и выходит берет */
+  vec3 v=p-vec3(0.0,0.080,0.625); v.y+=0.070*clamp((p.z-0.30)/0.44,0.0,1.0);
+  float peak=sdEllipsoid(v,vec3(0.445,0.058,0.300));
+  float body=smin(dome*0.92,peak,0.075);
+  float btn=sdSphere(q-vec3(0.0,0.575,-0.070),0.050);
+  return vec2(body,btn);
+}
+
+/* ---------- 6. шапка с помпоном ----------
+   Вязаный купол с толстым отворотом. Рифление даёт вязку. */
+vec2 hatBeanie(vec3 p){
+  vec3 q=p;
+  float dome=sdEllipsoid(q-vec3(0.0,0.20,0.0),vec3(0.56,0.62,0.56));
+  float ang=atan(q.z,q.x);
+  float knit=0.016*sin(14.0*ang)*smoothstep(0.10,0.40,q.y);
+  dome-=knit;
+  dome=smax(dome,-(p.y-0.02),0.04);
+  float cuff=sdTorus(p-vec3(0.0,0.17,0.0),vec2(0.525,0.175));
+  float rib=0.014*sin(16.0*ang);
+  cuff-=rib;
+  float body=smin(dome*0.94,cuff*0.94,0.05);
+  float pom=sdSphere(p-vec3(0.0,0.90,0.0),0.185);
+  return vec2(body,pom);
+}
+
+/* ---------- 7. феска ---------- */
+vec2 hatFez(vec3 p){
+  float body=sdRoundCone(p-vec3(0.0,0.02,0.0),0.425,0.465,0.88);
+  body=smax(body,-(p.y-0.012),0.03);
+  body=smax(body,p.y-0.90,0.028);
+  float cord=sdRoundCyl(p-vec3(0.0,0.925,0.0),0.080,0.030,0.026);
+  float lay=sdCapsule(p,vec3(0.0,0.925,0.0),vec3(0.36,0.905,0.14),0.026);
+  float fall=sdCapsule(p,vec3(0.38,0.905,0.15),vec3(0.525,0.530,0.215),0.025);
+  float brush=sdEllipsoid(p-vec3(0.535,0.435,0.220),vec3(0.062,0.135,0.062));
+  return vec2(body,min(min(cord,lay),min(fall,brush)));
+}
+
+float hatH(float id){
+  if(id<0.5) return 1.20;
+  if(id<1.5) return 1.70;
+  if(id<2.5) return 0.98;
+  if(id<3.5) return 0.64;
+  if(id<4.5) return 0.72;
+  if(id<5.5) return 0.50;
+  if(id<6.5) return 1.05;
+  return 0.92;
+}
+vec2 hatAt(float id,vec3 p){
+  if(id<0.5) return hatTop(p);
+  if(id<1.5) return hatSorting(p);
+  if(id<2.5) return hatFedora(p);
+  if(id<3.5) return hatPorkPie(p);
+  if(id<4.5) return hatDeer(p);
+  if(id<5.5) return hatFlatCap(p);
+  if(id<6.5) return hatBeanie(p);
+  return hatFez(p);
+}
+
+vec3 w2o(vec3 v){
+  v.yz=rot(-uTiltX)*v.yz;
+  v.xy=rot(-uTiltZ)*v.xy;
+  v.xz=rot(-uSpin)*v.xz;
+  return v;
+}
+vec3 o2w(vec3 v){
+  v.xz=rot(uSpin)*v.xz;
+  v.xy=rot(uTiltZ)*v.xy;
+  v.yz=rot(uTiltX)*v.yz;
+  return v;
+}
+
+vec2 map(vec3 pw){
+  vec3 p=w2o(pw-vec3(0.0,uOffY,0.0))/uScale;
+  vec2 r=hatAt(uA,p);
+  if(uMix>0.001){
+    r=mix(r,hatAt(uB,p),uMix);
+    /* прибавка съедает форму изнутри: мелочь прячется в тело, а не висит
+       в воздухе отдельными крошками */
+    r.y+=0.55*sin(PI*uMix);
+  }
+  float d=min(r.x,r.y);
+  return vec2(d*uScale, r.y<r.x?2.0:1.0);
+}
+
+vec3 calcNormal(vec3 p){
+  vec2 e=vec2(1.0,-1.0)*0.0014;
+  return normalize(e.xyy*map(p+e.xyy).x+e.yyx*map(p+e.yyx).x+e.yxy*map(p+e.yxy).x+e.xxx*map(p+e.xxx).x);
+}
+float softShadow(vec3 ro,vec3 rd){
+  float res=1.0, t=0.04;
+  for(int i=0;i<14;i++){
+    float h=map(ro+rd*t).x;
+    res=min(res,10.0*h/t);
+    t+=clamp(h,0.012,0.14);
+    if(res<0.02||t>2.4) break;
+  }
+  return clamp(res,0.0,1.0);
+}
+float calcAO(vec3 p,vec3 n){
+  float occ=0.0, sca=1.0;
+  for(int i=0;i<4;i++){
+    float h=0.018+0.13*float(i)/3.0;
+    occ+=(h-map(p+n*h).x)*sca;
+    sca*=0.72;
+  }
+  return clamp(1.0-2.6*occ,0.0,1.0);
+}
+
+/* Окружение задано формулой: сверху светлый проём, снизу глубокий синий,
+   сбоку тёплый отсвет. Отражения берутся отсюда - карты не нужны. */
+vec3 envCol(vec3 rd){
+  float y=rd.y*0.5+0.5;
+  vec3 c=mix(vec3(0.045,0.055,0.13),vec3(0.42,0.46,0.70),smoothstep(0.0,0.55,y));
+  c=mix(c,vec3(1.30,1.33,1.42),smoothstep(0.60,1.0,y));
+  float w=pow(max(dot(rd,normalize(vec3(-0.42,0.74,0.52))),0.0),22.0);
+  c+=vec3(2.35,2.32,2.45)*w;
+  float v=pow(max(dot(rd,normalize(vec3(0.88,-0.10,0.30))),0.0),7.0);
+  c+=vec3(0.85,0.35,0.80)*v*0.7;
+  return c;
+}
+vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.0,1.0); }
+
+void main(){
+  vec2 uv=(gl_FragCoord.xy-0.5*uRes)/uRes.y;
+  float ce=uCamEl;
+  vec3 ro=vec3(0.0,0.80+8.9*sin(ce),8.9*cos(ce));
+  vec3 ta=vec3(0.0,0.62,0.0);
+  vec3 ww=normalize(ta-ro);
+  vec3 uu=normalize(cross(ww,vec3(0.0,1.0,0.0)));
+  vec3 vv=cross(uu,ww);
+  vec3 rd=normalize(uv.x*uu+uv.y*vv+uFocal*ww);
+
+  /* фон отсекаем сферой: больше половины кадра - пустота */
+  vec3 oc=ro-vec3(0.0,0.80*uScale+uOffY,0.0);
+  float br=1.52*uScale;
+  float bb=dot(oc,rd);
+  float bc=dot(oc,oc)-br*br;
+  float bd=bb*bb-bc;
+  if(bd<0.0){ gl_FragColor=vec4(0.0); return; }
+  bd=sqrt(bd);
+  float tIn=max(-bb-bd,0.0), tOut=-bb+bd;
+  if(tOut<=0.0){ gl_FragColor=vec4(0.0); return; }
+
+  float t=tIn; float hit=0.0; float mat=1.0;
+  float stepK=(uMix>0.001&&uMix<0.999)?0.66:0.88;
+  for(int i=0;i<80;i++){
+    vec3 p=ro+rd*t;
+    vec2 h=map(p);
+    if(h.x<0.0007*t){ hit=1.0; mat=h.y; break; }
+    t+=h.x*stepK;
+    if(t>tOut) break;
+  }
+  if(hit<0.5){ gl_FragColor=vec4(0.0); return; }
+
+  vec3 p=ro+rd*t;
+  vec3 n=calcNormal(p);
+  vec3 po=w2o(p-vec3(0.0,uOffY,0.0))/uScale;
+
+  vec3 key=normalize(vec3(cos(uKeyEl)*sin(uKeyAz),sin(uKeyEl),cos(uKeyEl)*cos(uKeyAz)));
+  vec3 rim=normalize(vec3(-key.x,0.18,-key.z));
+  vec3 fil=normalize(vec3(0.60,0.30,0.72));
+
+  float sha=softShadow(p+n*0.02,key);
+  float ao=calcAO(p,n);
+
+  vec3 top=mix(uTopA,uTopB,uMix);
+  vec3 bot=mix(uBotA,uBotB,uMix);
+  vec3 acc=mix(uAccA,uAccB,uMix);
+  float hgt=mix(hatH(uA),hatH(uB),uMix);
+  vec3 base=mix(bot,top,smoothstep(-0.14,1.02,po.y/hgt));
+  float rough=uRough;
+  if(mat>1.5){ base=acc; rough=uRough*0.6; }
+
+  float ndl=max(dot(n,key),0.0);
+  float ndv=max(dot(n,-rd),0.0);
+  vec3 hv=normalize(key-rd);
+  float ndh=max(dot(n,hv),0.0);
+  float spec=pow(ndh,mix(40.0,900.0,1.0-rough));
+  float coat=pow(ndh,2400.0);
+  float fres=pow(1.0-ndv,4.5);
+
+  vec3 env=envCol(o2w(reflect(rd,n)));
+  vec3 amb=envCol(o2w(n));
+
+  vec3 col=base*(0.30*amb+vec3(0.92)*ndl*sha*0.78*uKeyPow);
+  col+=base*max(dot(n,fil),0.0)*0.22;
+  col+=env*(0.075+0.36*fres)*uEnv;
+  col+=vec3(1.0,0.99,1.0)*spec*sha*1.15*uKeyPow;
+  col+=vec3(1.0)*coat*sha*0.7*uKeyPow;
+  col+=mix(bot,top,0.7)*pow(max(dot(n,rim),0.0),2.4)*uRim;
+  col*=mix(0.55,1.0,ao);
+
+  col=aces(col*1.02);
+  col=pow(col,vec3(1.0/2.2));
+  gl_FragColor=vec4(col,1.0);
+}
+`;
+</script>
+<script>/* Тонкая обвязка над шейдером: заводит контекст и раздаёт значения.
+   В приложение уедет в сжатом виде, здесь - для мастерской. */
+window.HatGL = (function(){
+  "use strict";
+  var VERT = "attribute vec2 a;void main(){gl_Position=vec4(a,0.0,1.0);}";
+
+  var NAMES = ["uRes","uTime","uSpin","uTiltX","uTiltZ","uA","uB","uMix","uScale","uOffY",
+    "uTopA","uBotA","uAccA","uTopB","uBotB","uAccB",
+    "uRough","uEnv","uRim","uKeyAz","uKeyEl","uKeyPow","uCamEl","uFocal"];
+
+  function compile(gl, type, src){
+    var s = gl.createShader(type);
+    gl.shaderSource(s, src); gl.compileShader(s);
+    if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)){
+      console.warn(gl.getShaderInfoLog(s)); return null;
+    }
+    return s;
+  }
+
+  function lin(hex){
+    hex = String(hex||"").trim().replace("#","");
+    if(hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+    var n = parseInt(hex,16);
+    if(isNaN(n)) return [0.5,0.5,0.5];
+    return [((n>>16)&255)/255,((n>>8)&255)/255,(n&255)/255].map(function(c){
+      return Math.pow(c,2.2);
+    });
+  }
+
+  function create(canvas, opts){
+    opts = opts || {};
+    var gl = null;
+    try{
+      var at = {alpha:true,premultipliedAlpha:false,antialias:false,depth:false,
+        stencil:false,powerPreference:"low-power",
+        preserveDrawingBuffer:!!opts.keep};
+      gl = canvas.getContext("webgl",at) || canvas.getContext("experimental-webgl",at);
+    }catch(e){ gl = null; }
+    if(!gl) return null;
+    var vs = compile(gl, gl.VERTEX_SHADER, VERT);
+    var fs = compile(gl, gl.FRAGMENT_SHADER, window.HAT_FRAG);
+    if(!vs || !fs) return null;
+    var pr = gl.createProgram();
+    gl.attachShader(pr,vs); gl.attachShader(pr,fs);
+    gl.bindAttribLocation(pr,0,"a"); gl.linkProgram(pr);
+    if(!gl.getProgramParameter(pr,gl.LINK_STATUS)){ console.warn(gl.getProgramInfoLog(pr)); return null; }
+    gl.useProgram(pr);
+    var buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+
+    var U = {};
+    NAMES.forEach(function(k){ U[k] = gl.getUniformLocation(pr,k); });
+
+    var api = {
+      spin:0.55, tiltX:-0.045, tiltZ:0, a:0, b:1, mix:0, scale:1, offY:0,
+      topA:"#9B7BFF", botA:"#2C6BF0", accA:"#C3B6F0",
+      topB:"#9B7BFF", botB:"#2C6BF0", accB:"#C3B6F0",
+      rough:0.155, env:1, rim:0.5,
+      keyAz:-0.62, keyEl:0.92, keyPow:1, camEl:0.20, focal:3.85
+    };
+    api.resize = function(w,h,ratio){
+      var s = ratio || Math.min(2, Math.max(1, window.devicePixelRatio||1));
+      var W = Math.max(1,Math.round(w*s)), H = Math.max(1,Math.round(h*s));
+      if(canvas.width!==W||canvas.height!==H){ canvas.width=W; canvas.height=H; }
+      gl.viewport(0,0,W,H);
+      gl.uniform2f(U.uRes,W,H);
+    };
+    api.draw = function(time){
+      var c;
+      gl.uniform1f(U.uTime,time||0);
+      gl.uniform1f(U.uSpin,api.spin);
+      gl.uniform1f(U.uTiltX,api.tiltX);
+      gl.uniform1f(U.uTiltZ,api.tiltZ);
+      gl.uniform1f(U.uA,api.a); gl.uniform1f(U.uB,api.b);
+      gl.uniform1f(U.uMix,api.mix); gl.uniform1f(U.uScale,api.scale);
+      gl.uniform1f(U.uOffY,api.offY);
+      c=lin(api.topA); gl.uniform3f(U.uTopA,c[0],c[1],c[2]);
+      c=lin(api.botA); gl.uniform3f(U.uBotA,c[0],c[1],c[2]);
+      c=lin(api.accA); gl.uniform3f(U.uAccA,c[0],c[1],c[2]);
+      c=lin(api.topB); gl.uniform3f(U.uTopB,c[0],c[1],c[2]);
+      c=lin(api.botB); gl.uniform3f(U.uBotB,c[0],c[1],c[2]);
+      c=lin(api.accB); gl.uniform3f(U.uAccB,c[0],c[1],c[2]);
+      gl.uniform1f(U.uRough,api.rough);
+      gl.uniform1f(U.uEnv,api.env);
+      gl.uniform1f(U.uRim,api.rim);
+      gl.uniform1f(U.uKeyAz,api.keyAz);
+      gl.uniform1f(U.uKeyEl,api.keyEl);
+      gl.uniform1f(U.uKeyPow,api.keyPow);
+      gl.uniform1f(U.uCamEl,api.camEl);
+      gl.uniform1f(U.uFocal,api.focal);
+      gl.drawArrays(gl.TRIANGLES,0,3);
+    };
+    api.lost = function(){ return gl.isContextLost(); };
+    api.dispose = function(){
+      try{ var e=gl.getExtension("WEBGL_lose_context"); if(e) e.loseContext(); }catch(x){}
+    };
+    return api;
+  }
+  return {create:create, lin:lin};
+})();
+</script>
+<script>
+(function(){
+  "use strict";
+  var NAMES = ["цилиндр","распределяющая","федора","порк-пай",
+               "deerstalker","кепи «острых козырьков»","шапка с помпоном","феска"];
+  var COUNT = NAMES.length;
+
+  /* ---------- значения по умолчанию ---------- */
+  function fresh(){
+    return {
+      hueLo:232, hueHi:348, spread:0.70, split:34,
+      satLo:58, satHi:76, lightTop:68, lightBot:52,
+      accLight:82, accSat:26,
+      gloss:0.78, env:1.00, rim:0.50,
+      keyAz:-0.62, keyEl:0.92, keyPow:1.00,
+      speedLo:0.22, speedHi:0.62, wobLo:0.02, wobHi:0.09,
+      holdLo:2.4, holdHi:4.2, morph:0.78, trans:"morph",
+      camEl:0.20, focal:3.85
+    };
+  }
+  var S = fresh();
+
+  /* ---------- цвет ---------- */
+  function hsl(h,s,l){
+    h=((h%360)+360)%360; s/=100; l/=100;
+    var c=(1-Math.abs(2*l-1))*s, x=c*(1-Math.abs((h/60)%2-1)), m=l-c/2, r,g,b;
+    if(h<60){r=c;g=x;b=0;} else if(h<120){r=x;g=c;b=0;}
+    else if(h<180){r=0;g=c;b=x;} else if(h<240){r=0;g=x;b=c;}
+    else if(h<300){r=x;g=0;b=c;} else {r=c;g=0;b=x;}
+    function q(v){ var n=Math.round((v+m)*255); n=n<0?0:n>255?255:n;
+      return (n<16?"0":"")+n.toString(16); }
+    return "#"+q(r)+q(g)+q(b);
+  }
+  /* Оттенки раскладываются по золотому сечению: соседние уборы не слипаются
+     в один цвет, а весь отрезок гаммы оказывается занят. */
+  function hueOf(i){
+    var t = (i*0.6180339887)%1;
+    t = S.spread*t + (1-S.spread)*0.5;
+    return S.hueLo + (S.hueHi-S.hueLo)*t;
+  }
+  function paint(i){
+    var h = hueOf(i);
+    /* низ уводим к началу гаммы, но не за него: иначе синий проваливается
+       в голубой, а это уже другая гамма */
+    var hb = Math.max(S.hueLo - 6, h - S.split);
+    return {
+      top: hsl(h, S.satHi, S.lightTop),
+      bot: hsl(hb, S.satLo, S.lightBot),
+      acc: hsl(h, S.accSat, S.accLight)
+    };
+  }
+
+  /* ---------- характер движения ---------- */
+  function speedOf(i){
+    var t=(i*0.3819660113)%1;
+    return S.speedLo + (S.speedHi-S.speedLo)*t;
+  }
+  function wobOf(i){
+    var t=(i*0.7548776662)%1;
+    return S.wobLo + (S.wobHi-S.wobLo)*t;
+  }
+  function eccOf(i){ return 0.10 + 0.34*((i*0.5436890127)%1); }
+  function phaseOf(i){ return i*1.73; }
+
+  /* ---------- описания ползунков ---------- */
+  var SPEC = {
+    gColor:[
+      {k:"hue", dual:["hueLo","hueHi"], min:200, max:380, step:1, t:"Гамма",
+       fmt:function(){ return Math.round(S.hueLo)+"° … "+Math.round(S.hueHi)+"°"; }},
+      {k:"spread", min:0, max:1, step:.01, t:"Разброс по уборам",
+       fmt:function(){ return Math.round(S.spread*100)+"%"; }},
+      {k:"split", min:0, max:80, step:1, t:"Расхождение верх → низ",
+       fmt:function(){ return Math.round(S.split)+"°"; }},
+      {k:"sat", dual:["satLo","satHi"], min:0, max:100, step:1, t:"Насыщенность",
+       fmt:function(){ return Math.round(S.satLo)+" … "+Math.round(S.satHi); }},
+      {k:"lightTop", min:30, max:92, step:1, t:"Светлота верха",
+       fmt:function(){ return Math.round(S.lightTop); }},
+      {k:"lightBot", min:20, max:85, step:1, t:"Светлота низа",
+       fmt:function(){ return Math.round(S.lightBot); }},
+      {k:"accLight", min:35, max:100, step:1, t:"Светлота деталей",
+       fmt:function(){ return Math.round(S.accLight); }},
+      {k:"accSat", min:0, max:90, step:1, t:"Насыщенность деталей",
+       fmt:function(){ return Math.round(S.accSat); }}
+    ],
+    gMat:[
+      {k:"gloss", min:0, max:1, step:.01, t:"Глянец",
+       fmt:function(){ return Math.round(S.gloss*100)+"%"; }},
+      {k:"env", min:0, max:2, step:.01, t:"Сила отражений",
+       fmt:function(){ return S.env.toFixed(2); }},
+      {k:"rim", min:0, max:1.6, step:.01, t:"Ободковый свет",
+       fmt:function(){ return S.rim.toFixed(2); }},
+      {k:"keyPow", min:.3, max:1.8, step:.01, t:"Яркость света",
+       fmt:function(){ return S.keyPow.toFixed(2); }},
+      {k:"keyAz", min:-3.14, max:3.14, step:.01, t:"Свет: поворот",
+       fmt:function(){ return (S.keyAz*57.3).toFixed(0)+"°"; }},
+      {k:"keyEl", min:.12, max:1.5, step:.01, t:"Свет: высота",
+       fmt:function(){ return (S.keyEl*57.3).toFixed(0)+"°"; }}
+    ],
+    gAnim:[
+      {k:"speed", dual:["speedLo","speedHi"], min:0, max:1.3, step:.01,
+       t:"Скорость вращения",
+       fmt:function(){ return S.speedLo.toFixed(2)+" … "+S.speedHi.toFixed(2)+" рад/с"; }},
+      {k:"wob", dual:["wobLo","wobHi"], min:0, max:.22, step:.005, t:"Покачивание",
+       fmt:function(){ return S.wobLo.toFixed(3)+" … "+S.wobHi.toFixed(3); }},
+      {k:"hold", dual:["holdLo","holdHi"], min:1, max:8, step:.1, t:"Пауза между сменами",
+       fmt:function(){ return S.holdLo.toFixed(1)+" … "+S.holdHi.toFixed(1)+" с"; }},
+      {k:"morph", min:.25, max:1.8, step:.01, t:"Длительность смены",
+       fmt:function(){ return S.morph.toFixed(2)+" с"; }}
+    ],
+    gCam:[
+      {k:"camEl", min:0, max:.55, step:.005, t:"Высота камеры",
+       fmt:function(){ return (S.camEl*57.3).toFixed(0)+"°"; }},
+      {k:"focal", min:2.6, max:5.6, step:.02, t:"Фокусное",
+       fmt:function(){ return S.focal.toFixed(2); }}
+    ]
+  };
+
+  var PRESETS = {
+    "Глянец":  {gloss:.86, env:1.05, rim:.50, keyPow:1.00, keyEl:.92},
+    "Матовый": {gloss:.28, env:.45,  rim:.28, keyPow:1.05, keyEl:1.02},
+    "Эмаль":   {gloss:.70, env:.80,  rim:.85, keyPow:.92,  keyEl:.80},
+    "Металл":  {gloss:.94, env:1.75, rim:.30, keyPow:1.15, keyEl:1.10}
+  };
+  var TRANS = {morph:"перетекание", drop:"подброс", flip:"поворот"};
+
+  /* ---------- сборка управления ---------- */
+  var nodes = [];
+  function mkCtrl(host, sp){
+    var wrap=document.createElement("div"); wrap.className="ctrl";
+    var lab=document.createElement("div"); lab.className="lab";
+    var t=document.createElement("span"); t.textContent=sp.t;
+    var v=document.createElement("span"); v.className="val";
+    lab.appendChild(t); lab.appendChild(v); wrap.appendChild(lab);
+
+    if(sp.dual){
+      var d=document.createElement("div"); d.className="dual";
+      var tr=document.createElement("div"); tr.className="tr";
+      var fl=document.createElement("div"); fl.className="fl";
+      var lo=document.createElement("input"), hi=document.createElement("input");
+      [lo,hi].forEach(function(r,n){
+        r.type="range"; r.min=sp.min; r.max=sp.max; r.step=sp.step;
+        r.id=sp.k+"-"+(n?"hi":"lo");
+        r.setAttribute("aria-label", sp.t+(n?", верхнее значение":", нижнее значение"));
+      });
+      d.appendChild(tr); d.appendChild(fl); d.appendChild(lo); d.appendChild(hi);
+      wrap.appendChild(d);
+      function sync(){
+        var a=parseFloat(lo.value), b=parseFloat(hi.value);
+        if(a>b){ var m=a; a=b; b=m; }
+        S[sp.dual[0]]=a; S[sp.dual[1]]=b;
+        lo.value=a; hi.value=b;
+        var span=sp.max-sp.min;
+        fl.style.left=((a-sp.min)/span*100)+"%";
+        fl.style.width=((b-a)/span*100)+"%";
+        v.textContent=sp.fmt();
+      }
+      lo.addEventListener("input",function(){ sync(); changed(); });
+      hi.addEventListener("input",function(){ sync(); changed(); });
+      nodes.push(function(){ lo.value=S[sp.dual[0]]; hi.value=S[sp.dual[1]]; sync(); });
+    }else{
+      var r=document.createElement("input");
+      r.type="range"; r.min=sp.min; r.max=sp.max; r.step=sp.step; r.id=sp.k;
+      r.setAttribute("aria-label", sp.t);
+      wrap.appendChild(r);
+      r.addEventListener("input",function(){
+        S[sp.k]=parseFloat(r.value); v.textContent=sp.fmt(); changed();
+      });
+      nodes.push(function(){ r.value=S[sp.k]; v.textContent=sp.fmt(); });
+    }
+    host.appendChild(wrap);
+  }
+  Object.keys(SPEC).forEach(function(id){
+    var host=document.getElementById(id);
+    SPEC[id].forEach(function(sp){ mkCtrl(host, sp); });
+  });
+
+  var segP=document.getElementById("presets");
+  Object.keys(PRESETS).forEach(function(name){
+    var b=document.createElement("button"); b.type="button"; b.textContent=name;
+    b.setAttribute("aria-pressed","false");
+    b.addEventListener("click",function(){
+      var p=PRESETS[name];
+      Object.keys(p).forEach(function(k){ S[k]=p[k]; });
+      segP.querySelectorAll("button").forEach(function(x){
+        x.setAttribute("aria-pressed", x===b?"true":"false"); });
+      refresh(); changed();
+    });
+    segP.appendChild(b);
+  });
+
+  var segT=document.getElementById("trans");
+  Object.keys(TRANS).forEach(function(k){
+    var b=document.createElement("button"); b.type="button"; b.textContent=TRANS[k];
+    b.setAttribute("aria-pressed", S.trans===k?"true":"false");
+    b.addEventListener("click",function(){
+      S.trans=k;
+      segT.querySelectorAll("button").forEach(function(x){
+        x.setAttribute("aria-pressed", x===b?"true":"false"); });
+      changed();
+    });
+    segT.appendChild(b);
+  });
+
+  var picks=document.getElementById("picks"), auto=true, pickBtns=[];
+  function mkPick(label, idx){
+    var b=document.createElement("button"); b.type="button"; b.className="pick";
+    b.textContent=label; b.setAttribute("aria-pressed","false");
+    b.addEventListener("click",function(){
+      if(idx<0){ auto=true; }
+      else { auto=false; jumpTo(idx); }
+      markPicks();
+    });
+    picks.appendChild(b); pickBtns.push({el:b, idx:idx});
+    return b;
+  }
+  mkPick("по кругу", -1);
+  NAMES.forEach(function(n,i){ mkPick(n, i); });
+  function markPicks(){
+    pickBtns.forEach(function(p){
+      var on = p.idx<0 ? auto : (!auto && p.idx===cur);
+      p.el.setAttribute("aria-pressed", on?"true":"false");
+    });
+  }
+
+  /* ---------- сцена ---------- */
+  var big = document.getElementById("big");
+  var small = document.getElementById("small");
+  var R = window.HatGL.create(big);
+  var R2 = window.HatGL.create(small);
+  if(!R){
+    document.getElementById("stage").innerHTML =
+      '<div class="nogl">Этот браузер не показывает объёмную графику.<br>' +
+      'В самой игре на этот случай остаются плоские значки.</div>';
+  }
+
+  var cur=0, nxt=1, hold=3.0, acc=0, morph=-1, clock=0, spin=0.55;
+  var reduced=false;
+  try{ reduced = window.matchMedia("(prefers-reduced-motion:reduce)").matches; }catch(e){}
+  var running = !reduced;
+  var playBtn=document.getElementById("play");
+  if(reduced){
+    playBtn.hidden=false;
+    playBtn.addEventListener("click",function(){
+      running=!running;
+      playBtn.textContent = running ? "Остановить движение" : "Запустить движение";
+      if(running) tick(performance.now());
+    });
+  }
+
+  function pickHold(){
+    return S.holdLo + Math.random()*Math.max(0, S.holdHi-S.holdLo);
+  }
+  function jumpTo(i){ cur=i; nxt=(i+1)%COUNT; morph=-1; acc=0; apply(); draw(0); }
+  function startSwitch(){
+    if(morph>=0) return;
+    morph=0; nxt=(cur+1)%COUNT;
+  }
+
+  function apply(){
+    var pa=paint(cur), pb=paint(nxt);
+    [R,R2].forEach(function(r){
+      if(!r) return;
+      r.a=cur; r.b=nxt;
+      r.topA=pa.top; r.botA=pa.bot; r.accA=pa.acc;
+      r.topB=pb.top; r.botB=pb.bot; r.accB=pb.acc;
+      r.rough = 0.34 - 0.30*S.gloss;
+      r.env=S.env; r.rim=S.rim;
+      r.keyAz=S.keyAz; r.keyEl=S.keyEl; r.keyPow=S.keyPow;
+      r.camEl=S.camEl; r.focal=S.focal;
+    });
+    document.getElementById("nm").textContent = NAMES[cur];
+  }
+
+  function draw(t){
+    [R,R2].forEach(function(r){ if(r) r.draw(t); });
+  }
+
+  function step(dt){
+    clock+=dt;
+    var m = morph<0 ? 0 : morph;
+    var e = m*m*(3-2*m);
+
+    var sp = speedOf(cur)*(1-e) + speedOf(nxt)*e;
+    var wb = wobOf(cur)*(1-e) + wobOf(nxt)*e;
+    var ec = eccOf(cur)*(1-e) + eccOf(nxt)*e;
+    var ph = phaseOf(cur);
+
+    spin += dt*sp*(1 + ec*Math.sin(clock*0.63 + ph));
+    var tiltX = -0.045 + wb*Math.sin(clock*0.47 + ph);
+    var tiltZ = wb*0.75*Math.sin(clock*0.61 + ph*1.3);
+    var scale = 1, offY = 0, mixv = 0;
+
+    if(morph>=0){
+      morph += dt/S.morph;
+      if(morph>=1){
+        cur=nxt; nxt=(cur+1)%COUNT; morph=-1; acc=0; hold=pickHold();
+        apply(); markPicks();
+      }else{
+        if(S.trans==="morph"){
+          mixv = e;
+          scale = 1 - 0.06*Math.sin(Math.PI*morph);
+        }else if(S.trans==="drop"){
+          mixv = morph<0.5 ? 0 : 1;
+          var u = morph<0.5 ? morph*2 : (morph-0.5)*2;
+          offY = morph<0.5 ? -2.6*u*u : -2.6*(1-u)*(1-u);
+          scale = 1 - 0.10*Math.sin(Math.PI*morph);
+        }else{
+          mixv = morph<0.5 ? 0 : 1;
+          spin += dt*(Math.PI*2.4);
+          scale = 1 - 0.09*Math.sin(Math.PI*morph);
+        }
+      }
+    }
+    if(morph<0){
+      acc += dt;
+      if(auto && acc>=hold) startSwitch();
+    }
+
+    [R,R2].forEach(function(r){
+      if(!r) return;
+      r.spin=spin; r.tiltX=tiltX; r.tiltZ=tiltZ;
+      r.mix=mixv; r.scale=scale; r.offY=offY;
+    });
+  }
+
+  var last=0;
+  function tick(now){
+    if(!running) return;
+    requestAnimationFrame(tick);
+    var dt = last ? Math.min(0.05,(now-last)/1000) : 0.016;
+    last=now;
+    step(dt);
+    draw(clock);
+  }
+
+  function fit(){
+    var st=document.getElementById("stage");
+    var w=st.clientWidth||360;
+    if(R) R.resize(w,w,Math.min(2,window.devicePixelRatio||1));
+    if(R2) R2.resize(148,148,Math.min(2,window.devicePixelRatio||1));
+    draw(clock);
+  }
+  window.addEventListener("resize",fit);
+
+  /* ---------- вывод ---------- */
+  function swatches(){
+    var host=document.getElementById("swatches");
+    host.innerHTML="";
+    for(var i=0;i<COUNT;i++){
+      var p=paint(i);
+      var d=document.createElement("div"); d.className="sw";
+      d.style.background="linear-gradient(160deg,"+p.top+","+p.bot+")";
+      d.title=NAMES[i]+": "+p.top+" → "+p.bot;
+      host.appendChild(d);
+    }
+  }
+  function dump(){
+    var lines=[];
+    lines.push("Покраска по уборам:");
+    for(var i=0;i<COUNT;i++){
+      var p=paint(i);
+      lines.push("  "+(NAMES[i]+"                     ").slice(0,24)+
+        " верх "+p.top+"  низ "+p.bot+"  деталь "+p.acc);
+    }
+    lines.push("");
+    lines.push("Движение по уборам:");
+    for(i=0;i<COUNT;i++){
+      lines.push("  "+(NAMES[i]+"                     ").slice(0,24)+
+        " скорость "+speedOf(i).toFixed(3)+"  качание "+wobOf(i).toFixed(3)+
+        "  неровность "+eccOf(i).toFixed(2));
+    }
+    lines.push("");
+    lines.push("Настройки:");
+    lines.push("  " + JSON.stringify(S, null, 1).replace(/\n/g,"\n  "));
+    document.getElementById("out").textContent = lines.join("\n");
+  }
+  function refresh(){ nodes.forEach(function(f){ f(); }); }
+  function changed(){ apply(); swatches(); dump(); if(!running) draw(clock); }
+
+  document.getElementById("copy").addEventListener("click",function(){
+    var txt=document.getElementById("out").textContent;
+    var said=document.getElementById("said");
+    function fallback(){
+      var pre=document.getElementById("out");
+      var sel=window.getSelection(); var rg=document.createRange();
+      rg.selectNodeContents(pre); sel.removeAllRanges(); sel.addRange(rg);
+      said.textContent="Текст выделен — скопируйте его вручную.";
+    }
+    try{
+      navigator.clipboard.writeText(txt).then(function(){
+        said.textContent="Скопировано. Пришлите мне этот текст.";
+      },fallback);
+    }catch(e){ fallback(); }
+  });
+  document.getElementById("reset").addEventListener("click",function(){
+    S=fresh(); refresh(); changed();
+    document.getElementById("said").textContent="Вернул исходные значения.";
+    document.querySelectorAll("#presets button").forEach(function(x){
+      x.setAttribute("aria-pressed","false"); });
+    document.querySelectorAll("#trans button").forEach(function(x){
+      x.setAttribute("aria-pressed", x.textContent===TRANS[S.trans]?"true":"false"); });
+  });
+
+  hold=pickHold();
+  refresh(); apply(); swatches(); dump(); markPicks(); fit();
+  if(running) requestAnimationFrame(tick); else draw(clock);
+})();
+</script>
+</body>
+</html>

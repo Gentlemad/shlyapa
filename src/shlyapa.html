@@ -11,8 +11,6 @@
     --line:#CAD2DE; --line-strong:#A1ABBB;
     --accent:#1F6FEB; --accent-2:#5AA9F7; --accent-soft:rgba(31,111,235,.12);
     --ok:#2E9E74; --danger:#D9483B; --gold:#D9A21B; --violet:#7A5AF5;
-    /* объёмный герой главного экрана: верх, низ и жемчужный акцент */
-    --hat-top:#9B7BFF; --hat-bot:#2C6BF0; --hat-acc:#C3B6F0;
     --shadow:0 1px 2px rgba(20,24,32,.06), 0 10px 26px rgba(20,24,32,.10);
     --ui:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;
     --mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
@@ -779,6 +777,9 @@
     transform:translateY(11px) scale(.92) rotate(-5deg);
     transition:opacity .42s ease, transform .42s cubic-bezier(.2,.9,.3,1)}
   .hatstack .hi.on{opacity:1;transform:none}
+  /* пока ждём объём, плоский значок не показываем: иначе он мелькает
+     на долю секунды и подменяется. Ожидание снимается по таймеру. */
+  .hatstack.wait .hi,.hatstack.wait .hi.on{opacity:0}
   .hatstack .hi svg{width:100%;height:100%}
   /* объёмный слой ложится поверх значков и проявляется, когда готов */
   .hatstack .h3d{position:absolute;inset:0;width:100%;height:100%;display:block;
@@ -943,16 +944,18 @@
 
    Поверхности заданы формулами расстояния (SDF) и считаются лучом прямо в
    пикселе, поэтому полигонов нет вовсе: силуэт остаётся гладким на любом
-   экране и при любом увеличении. Библиотека не нужна - весь рендер ниже.  */
+   экране и при любом увеличении. Библиотека не нужна - весь рендер ниже.
+
+   Подбор внешнего вида идёт в отдельной мастерской, tune.html: она выдаёт
+   ровно те числа, что лежат в таблице LOOK.  */
 (function(global){
   "use strict";
 
-  var VERT =
-    "attribute vec2 a;void main(){gl_Position=vec4(a,0.0,1.0);}";
+  var VERT = "attribute vec2 a;void main(){gl_Position=vec4(a,0.0,1.0);}";
 
   var FRAG = [
 "precision highp float;",
-"uniform vec2 uRes;",
+"uniform vec2  uRes;",
 "uniform float uTime;",
 "uniform float uSpin;",
 "uniform float uTiltX;",
@@ -961,23 +964,32 @@
 "uniform float uB;",
 "uniform float uMix;",
 "uniform float uScale;",
-"uniform vec3 uTop;",
-"uniform vec3 uBot;",
-"uniform vec3 uAcc;",
+"uniform float uOffY;",
+"uniform vec3  uTopA;",
+"uniform vec3  uBotA;",
+"uniform vec3  uAccA;",
+"uniform vec3  uTopB;",
+"uniform vec3  uBotB;",
+"uniform vec3  uAccB;",
+"uniform float uRough;",
+"uniform float uEnv;",
+"uniform float uRim;",
+"uniform float uKeyAz;",
+"uniform float uKeyEl;",
+"uniform float uKeyPow;",
+"uniform float uCamEl;",
+"uniform float uFocal;",
 "#define PI 3.14159265",
-
+"",
 "mat2 rot(float a){ float c=cos(a), s=sin(a); return mat2(c,-s,s,c); }",
-
 "float smin(float a,float b,float k){ float h=clamp(0.5+0.5*(b-a)/k,0.0,1.0); return mix(b,a,h)-k*h*(1.0-h); }",
 "float smax(float a,float b,float k){ return -smin(-a,-b,k); }",
-
+"",
 "float sdSphere(vec3 p,float r){ return length(p)-r; }",
-
 "float sdRoundCyl(vec3 p,float r,float h,float rb){",
 "  vec2 d=vec2(length(p.xz)-(r-rb), abs(p.y)-(h-rb));",
 "  return min(max(d.x,d.y),0.0)+length(max(d,0.0))-rb;",
 "}",
-
 "float sdRoundCone(vec3 p,float r1,float r2,float h){",
 "  vec2 q=vec2(length(p.xz),p.y);",
 "  float b=(r1-r2)/h;",
@@ -987,96 +999,181 @@
 "  if(k>a*h) return length(q-vec2(0.0,h))-r2;",
 "  return dot(q,vec2(a,b))-r1;",
 "}",
-
 "float sdEllipsoid(vec3 p,vec3 r){",
 "  float k0=length(p/r); float k1=length(p/(r*r));",
 "  return k0*(k0-1.0)/max(k1,1e-5);",
 "}",
-
 "float sdTorus(vec3 p,vec2 t){ vec2 q=vec2(length(p.xz)-t.x,p.y); return length(q)-t.y; }",
-
-"vec2 opU(vec2 a,vec2 b){ return a.x<b.x?a:b; }",
-
-/* ---- цилиндр ---- */
+"float sdCapsule(vec3 p,vec3 a,vec3 b,float r){",
+"  vec3 pa=p-a, ba=b-a;",
+"  float h=clamp(dot(pa,ba)/dot(ba,ba),0.0,1.0);",
+"  return length(pa-ba*h)-r;",
+"}",
+"",
+"/* Поля почти у всех уборов - диск с подвёрнутым краем. Одна деталь на всех. */",
+"float brimOf(vec3 p,float rad,float thick,float curl,float front){",
+"  vec3 b=p;",
+"  float rr=clamp(length(p.xz)/rad,0.0,1.0);",
+"  b.y-=curl*rr*rr;",
+"  /* спереди поле опущено, сзади поднято: так шляпа перестаёт быть тарелкой */",
+"  b.y+=front*rr*rr*clamp(p.z/rad,-1.0,1.0);",
+"  return sdRoundCyl(b-vec3(0.0,0.03,0.0),rad,thick,thick*0.9);",
+"}",
+"",
+"/* ---------- 0. цилиндр ---------- */",
 "vec2 hatTop(vec3 p){",
 "  vec3 q=p; q.xz/=(1.0+0.055*p.y);",
 "  float crown=sdRoundCyl(q-vec3(0.0,0.62,0.0),0.50,0.56,0.075)*0.94;",
-"  vec3 b=p; float rr=clamp(length(p.xz)/0.94,0.0,1.0); b.y-=0.06*rr*rr;",
-"  float brim=sdRoundCyl(b-vec3(0.0,0.03,0.0),0.94,0.042,0.038);",
+"  float brim=brimOf(p,0.94,0.042,0.06,0.0);",
 "  float body=smin(crown,brim,0.05);",
 "  float band=sdRoundCyl(p-vec3(0.0,0.18,0.0),0.536,0.085,0.028);",
 "  return vec2(body,band);",
 "}",
-
-/* ---- колпак ---- */
-"vec2 hatCone(vec3 p){",
+"",
+"/* ---------- 1. распределяющая ----------",
+"   Ось загнута вперёд, по конусу идут складки: без них это просто колпак. */",
+"vec2 hatSorting(vec3 p){",
 "  vec3 q=p;",
-"  float t=clamp(q.y/1.32,0.0,1.0);",
-"  q.x-=0.155*t*t;",
-"  q.xz/=(1.0-0.13*sin(PI*t));",
-"  float cone=sdRoundCone(q-vec3(0.0,0.02,0.0),0.56,0.05,1.30)*0.82;",
+"  float t=clamp(q.y/1.68,0.0,1.0);",
+"  q.x-=0.46*t*t*t;",
+"  q.xz*=rot(0.55*t*t);",
+"  q.xz/=(1.0-0.12*sin(PI*t));",
+"  float cone=sdRoundCone(q-vec3(0.0,0.02,0.0),0.58,0.045,1.66);",
+"  float ang=atan(q.z,q.x);",
+"  float fold=0.040*sin(5.0*ang+4.2*t)*smoothstep(0.08,0.45,t)",
+"            +0.022*sin(9.0*t+1.7)*smoothstep(0.15,0.6,t);",
+"  cone=(cone-fold)*0.70;",
 "  cone=smax(cone,-(p.y-0.012),0.03);",
-"  vec3 b=p; float rr=clamp(length(p.xz)/0.82,0.0,1.0); b.y-=0.10*rr*rr;",
-"  float brim=sdRoundCyl(b-vec3(0.0,0.035,0.0),0.82,0.046,0.042);",
-"  float body=smin(cone,brim,0.10);",
-"  float pom=sdSphere(p-vec3(0.155,1.315,0.0),0.115);",
-"  return vec2(body,pom);",
+"  float brim=brimOf(p,0.92,0.050,0.09,0.0);",
+"  float body=smin(cone,brim,0.11);",
+"  /* складка-«рот» вырезана в поверхности, а не приставлена к ней */",
+"  float mouth=sdCapsule(p,vec3(-0.30,0.44,0.40),vec3(0.26,0.38,0.42),0.070);",
+"  body=smax(body,-mouth,0.045);",
+"  return vec2(body,1e5);",
 "}",
-
-/* ---- корона ----
-   Зубцы не приставлены к ободу, а вырезаны из него: так у короны единый
-   силуэт, а не «свечки на торте». */
-"vec2 hatCrown(vec3 p){",
-"  float band=sdRoundCyl(p-vec3(0.0,0.36,0.0),0.60,0.42,0.05);",
-"  float a=atan(p.z,p.x);",
-"  float sect=2.0*PI/6.0;",
-"  float i=floor(a/sect+0.5);",
-"  float ra=a-i*sect;",
-"  float rad=length(p.xz);",
-"  vec3 sp=vec3(rad*sin(ra),p.y,rad*cos(ra));",
-"  float notch=sdRoundCone(vec3(sp.x,1.12-sp.y,sp.z-0.66),0.42,0.02,0.68);",
-"  band=smax(band,-notch,0.035);",
-"  float hollow=sdRoundCyl(p-vec3(0.0,1.02,0.0),0.50,0.40,0.05);",
-"  band=smax(band,-hollow,0.04);",
-"  float rim=sdRoundCyl(p-vec3(0.0,0.0,0.0),0.628,0.042,0.04);",
-"  float j=floor(a/sect);",
-"  float rb=a-(j+0.5)*sect;",
-"  vec3 gp=vec3(rad*sin(rb),p.y,rad*cos(rb));",
-"  float tip=sdSphere(vec3(gp.x,gp.y-0.795,gp.z-0.60),0.082);",
-"  float stud=1e5;",
-"  return vec2(band,min(min(rim,tip),stud));",
+"",
+"/* ---------- 2. федора ----------",
+"   Вмятина вдоль тульи и два защипа спереди - вычитаются из купола. */",
+"vec2 hatFedora(vec3 p){",
+"  float crown=sdRoundCyl(p-vec3(0.0,0.36,0.0),0.470,0.345,0.115);",
+"  float crease=sdCapsule(p,vec3(0.0,0.735,-0.34),vec3(0.0,0.735,0.38),0.135);",
+"  crown=smax(crown,-crease,0.05);",
+"  float pinchL=sdSphere(p-vec3(-0.37,0.585,0.20),0.150);",
+"  float pinchR=sdSphere(p-vec3( 0.37,0.585,0.20),0.150);",
+"  crown=smax(crown,-pinchL,0.045);",
+"  crown=smax(crown,-pinchR,0.045);",
+"  float brim=brimOf(p,1.02,0.038,0.105,-0.21);",
+"  float body=smin(crown,brim,0.06);",
+"  float band=sdRoundCyl(p-vec3(0.0,0.155,0.0),0.505,0.085,0.028);",
+"  return vec2(body,band);",
 "}",
-
-/* ---- кепка ---- */
-"vec2 hatCap(vec3 p){",
-"  vec3 q=p; q.y/=0.80;",
-"  float dome=sdSphere(q-vec3(0.0,0.10,0.0),0.645)*0.80;",
-"  dome=smax(dome,-(p.y-0.05),0.05);",
-"  vec3 v=p-vec3(0.0,0.055,0.50);",
-"  float f=clamp((p.z-0.10)/0.72,0.0,1.0);",
-"  v.y+=0.20*f*f;",
-"  float visor=sdEllipsoid(v,vec3(0.72,0.068,0.46));",
-"  float body=smin(dome,visor,0.10);",
-"  float band=sdRoundCyl(p-vec3(0.0,0.075,0.0),0.655,0.055,0.05);",
-"  body=smin(body,band,0.05);",
-"  float btn=sdSphere(p-vec3(0.0,0.60,0.0),0.072);",
+"",
+"/* ---------- 3. порк-пай ----------",
+"   Низкая тулья с плоским верхом и кольцевой канавкой по краю. */",
+"vec2 hatPorkPie(vec3 p){",
+"  float crown=sdRoundCyl(p-vec3(0.0,0.29,0.0),0.465,0.29,0.055);",
+"  float groove=sdTorus(p-vec3(0.0,0.575,0.0),vec2(0.385,0.070));",
+"  crown=smax(crown,-groove,0.028);",
+"  float brim=brimOf(p,0.90,0.040,0.145,0.0);",
+"  float body=smin(crown,brim,0.045);",
+"  float band=sdRoundCyl(p-vec3(0.0,0.135,0.0),0.498,0.072,0.026);",
+"  return vec2(body,band);",
+"}",
+"",
+"/* ---------- 4. deerstalker ----------",
+"   Купол со швом, два козырька и прижатые по бокам уши. */",
+"vec2 hatDeer(vec3 p){",
+"  vec3 q=p; q.y/=0.88;",
+"  float dome=sdEllipsoid(q-vec3(0.0,0.11,0.0),vec3(0.555,0.455,0.565))*0.88;",
+"  vec3 vf=p-vec3(0.0,0.095,0.545); vf.y+=0.11*clamp((p.z-0.20)/0.52,0.0,1.0);",
+"  float peakF=sdEllipsoid(vf,vec3(0.505,0.072,0.305));",
+"  vec3 vb=p-vec3(0.0,0.095,-0.545); vb.y+=0.11*clamp((-p.z-0.20)/0.52,0.0,1.0);",
+"  float peakB=sdEllipsoid(vb,vec3(0.505,0.072,0.305));",
+"  /* уши прижаты вплотную: отставленные читаются как крылья */",
+"  float earL=sdEllipsoid(p-vec3(-0.405,0.205,0.0),vec3(0.072,0.150,0.245));",
+"  float earR=sdEllipsoid(p-vec3( 0.405,0.205,0.0),vec3(0.072,0.150,0.245));",
+"  float body=smin(smin(dome,peakF,0.055),peakB,0.055);",
+"  body=smin(smin(body,earL,0.125),earR,0.125);",
+"  /* шов - канавка по макушке, а не приставленная палка */",
+"  float seam=sdCapsule(p,vec3(0.0,0.64,-0.30),vec3(0.0,0.64,0.30),0.042);",
+"  body=smax(body,-seam,0.028);",
+"  float knot=sdTorus(p-vec3(0.0,0.565,0.0),vec2(0.060,0.026));",
+"  return vec2(body,knot);",
+"}",
+"",
+"/* ---------- 5. кепи «острых козырьков» ----------",
+"   Плоская восьмиклинка: приплюснутый купол, свисающий вперёд, и короткий",
+"   жёсткий козырёк. Клинья - радиальные канавки на верху. */",
+"vec2 hatFlatCap(vec3 p){",
+"  vec3 q=p;",
+"  q.yz*=rot(-0.215);",
+"  /* купол из двух частей: сзади выше, спереди свисает на козырёк.",
+"     Один ровный эллипсоид читается беретом, «таблетка» - лепёшкой. */",
+"  float back=sdEllipsoid(q-vec3(0.0,0.300,-0.090),vec3(0.545,0.285,0.505));",
+"  float front=sdEllipsoid(q-vec3(0.0,0.215,0.285),vec3(0.510,0.160,0.440));",
+"  float dome=smin(back,front,0.13);",
+"  dome=smax(dome,-(q.y-0.045),0.055);",
+"  float ang=atan(q.z,q.x);",
+"  float panel=0.022*sin(4.0*ang)*smoothstep(0.33,0.52,q.y);",
+"  dome-=panel;",
+"  /* козырёк вынесен дальше вперёд: иначе купол его съедает и выходит берет */",
+"  vec3 v=p-vec3(0.0,0.080,0.625); v.y+=0.070*clamp((p.z-0.30)/0.44,0.0,1.0);",
+"  float peak=sdEllipsoid(v,vec3(0.445,0.058,0.300));",
+"  float body=smin(dome*0.92,peak,0.075);",
+"  float btn=sdSphere(q-vec3(0.0,0.575,-0.070),0.050);",
 "  return vec2(body,btn);",
 "}",
-
-"float hatH(float id){",
-"  if(id<0.5) return 1.44;",
-"  if(id<1.5) return 1.44;",
-"  if(id<2.5) return 0.90;",
-"  return 0.70;",
+"",
+"/* ---------- 6. шапка с помпоном ----------",
+"   Вязаный купол с толстым отворотом. Рифление даёт вязку. */",
+"vec2 hatBeanie(vec3 p){",
+"  vec3 q=p;",
+"  float dome=sdEllipsoid(q-vec3(0.0,0.20,0.0),vec3(0.56,0.62,0.56));",
+"  float ang=atan(q.z,q.x);",
+"  float knit=0.016*sin(14.0*ang)*smoothstep(0.10,0.40,q.y);",
+"  dome-=knit;",
+"  dome=smax(dome,-(p.y-0.02),0.04);",
+"  float cuff=sdTorus(p-vec3(0.0,0.17,0.0),vec2(0.525,0.175));",
+"  float rib=0.014*sin(16.0*ang);",
+"  cuff-=rib;",
+"  float body=smin(dome*0.94,cuff*0.94,0.05);",
+"  float pom=sdSphere(p-vec3(0.0,0.90,0.0),0.185);",
+"  return vec2(body,pom);",
 "}",
-
+"",
+"/* ---------- 7. феска ---------- */",
+"vec2 hatFez(vec3 p){",
+"  float body=sdRoundCone(p-vec3(0.0,0.02,0.0),0.425,0.465,0.88);",
+"  body=smax(body,-(p.y-0.012),0.03);",
+"  body=smax(body,p.y-0.90,0.028);",
+"  float cord=sdRoundCyl(p-vec3(0.0,0.925,0.0),0.080,0.030,0.026);",
+"  float lay=sdCapsule(p,vec3(0.0,0.925,0.0),vec3(0.36,0.905,0.14),0.026);",
+"  float fall=sdCapsule(p,vec3(0.38,0.905,0.15),vec3(0.525,0.530,0.215),0.025);",
+"  float brush=sdEllipsoid(p-vec3(0.535,0.435,0.220),vec3(0.062,0.135,0.062));",
+"  return vec2(body,min(min(cord,lay),min(fall,brush)));",
+"}",
+"",
+"float hatH(float id){",
+"  if(id<0.5) return 1.20;",
+"  if(id<1.5) return 1.70;",
+"  if(id<2.5) return 0.98;",
+"  if(id<3.5) return 0.64;",
+"  if(id<4.5) return 0.72;",
+"  if(id<5.5) return 0.50;",
+"  if(id<6.5) return 1.05;",
+"  return 0.92;",
+"}",
 "vec2 hatAt(float id,vec3 p){",
 "  if(id<0.5) return hatTop(p);",
-"  if(id<1.5) return hatCone(p);",
-"  if(id<2.5) return hatCrown(p);",
-"  return hatCap(p);",
+"  if(id<1.5) return hatSorting(p);",
+"  if(id<2.5) return hatFedora(p);",
+"  if(id<3.5) return hatPorkPie(p);",
+"  if(id<4.5) return hatDeer(p);",
+"  if(id<5.5) return hatFlatCap(p);",
+"  if(id<6.5) return hatBeanie(p);",
+"  return hatFez(p);",
 "}",
-
+"",
 "vec3 w2o(vec3 v){",
 "  v.yz=rot(-uTiltX)*v.yz;",
 "  v.xy=rot(-uTiltZ)*v.xy;",
@@ -1089,25 +1186,24 @@
 "  v.yz=rot(uTiltX)*v.yz;",
 "  return v;",
 "}",
-
+"",
 "vec2 map(vec3 pw){",
-"  vec3 p=w2o(pw)/uScale;",
+"  vec3 p=w2o(pw-vec3(0.0,uOffY,0.0))/uScale;",
 "  vec2 r=hatAt(uA,p);",
 "  if(uMix>0.001){",
 "    r=mix(r,hatAt(uB,p),uMix);",
-/* прибавка к расстоянию съедает форму изнутри: на время перехода мелочь
-   уходит в тело, а не висит отдельными крошками */
+"    /* прибавка съедает форму изнутри: мелочь прячется в тело, а не висит",
+"       в воздухе отдельными крошками */",
 "    r.y+=0.55*sin(PI*uMix);",
 "  }",
 "  float d=min(r.x,r.y);",
 "  return vec2(d*uScale, r.y<r.x?2.0:1.0);",
 "}",
-
+"",
 "vec3 calcNormal(vec3 p){",
 "  vec2 e=vec2(1.0,-1.0)*0.0014;",
 "  return normalize(e.xyy*map(p+e.xyy).x+e.yyx*map(p+e.yyx).x+e.yxy*map(p+e.yxy).x+e.xxx*map(p+e.xxx).x);",
 "}",
-
 "float softShadow(vec3 ro,vec3 rd){",
 "  float res=1.0, t=0.04;",
 "  for(int i=0;i<14;i++){",
@@ -1118,7 +1214,6 @@
 "  }",
 "  return clamp(res,0.0,1.0);",
 "}",
-
 "float calcAO(vec3 p,vec3 n){",
 "  float occ=0.0, sca=1.0;",
 "  for(int i=0;i<4;i++){",
@@ -1128,9 +1223,9 @@
 "  }",
 "  return clamp(1.0-2.6*occ,0.0,1.0);",
 "}",
-
-/* Окружение задано формулой: сверху светлый проём, снизу глубокий синий,
-   сбоку фиолетовый отсвет. Отражения берутся отсюда - карты не нужны. */
+"",
+"/* Окружение задано формулой: сверху светлый проём, снизу глубокий синий,",
+"   сбоку тёплый отсвет. Отражения берутся отсюда - карты не нужны. */",
 "vec3 envCol(vec3 rd){",
 "  float y=rd.y*0.5+0.5;",
 "  vec3 c=mix(vec3(0.045,0.055,0.13),vec3(0.42,0.46,0.70),smoothstep(0.0,0.55,y));",
@@ -1138,25 +1233,24 @@
 "  float w=pow(max(dot(rd,normalize(vec3(-0.42,0.74,0.52))),0.0),22.0);",
 "  c+=vec3(2.35,2.32,2.45)*w;",
 "  float v=pow(max(dot(rd,normalize(vec3(0.88,-0.10,0.30))),0.0),7.0);",
-"  c+=vec3(0.60,0.30,1.15)*v*0.7;",
+"  c+=vec3(0.85,0.35,0.80)*v*0.7;",
 "  return c;",
 "}",
-
 "vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.0,1.0); }",
-
+"",
 "void main(){",
 "  vec2 uv=(gl_FragCoord.xy-0.5*uRes)/uRes.y;",
-"  vec3 ro=vec3(0.0,2.45,8.60);",
-"  vec3 ta=vec3(0.0,0.56,0.0);",
+"  float ce=uCamEl;",
+"  vec3 ro=vec3(0.0,0.80+8.9*sin(ce),8.9*cos(ce));",
+"  vec3 ta=vec3(0.0,0.62,0.0);",
 "  vec3 ww=normalize(ta-ro);",
 "  vec3 uu=normalize(cross(ww,vec3(0.0,1.0,0.0)));",
 "  vec3 vv=cross(uu,ww);",
-"  vec3 rd=normalize(uv.x*uu+uv.y*vv+3.85*ww);",
-
-/* Фон отсекаем сферой вокруг фигуры: иначе каждый пустой пиксель гонит
-   луч через всю сцену, а таких пикселей больше половины кадра. */
-"  vec3 oc=ro-vec3(0.0,0.70*uScale,0.0);",
-"  float br=1.36*uScale;",
+"  vec3 rd=normalize(uv.x*uu+uv.y*vv+uFocal*ww);",
+"",
+"  /* фон отсекаем сферой: больше половины кадра - пустота */",
+"  vec3 oc=ro-vec3(0.0,0.80*uScale+uOffY,0.0);",
+"  float br=1.52*uScale;",
 "  float bb=dot(oc,rd);",
 "  float bc=dot(oc,oc)-br*br;",
 "  float bd=bb*bb-bc;",
@@ -1164,35 +1258,37 @@
 "  bd=sqrt(bd);",
 "  float tIn=max(-bb-bd,0.0), tOut=-bb+bd;",
 "  if(tOut<=0.0){ gl_FragColor=vec4(0.0); return; }",
-
+"",
 "  float t=tIn; float hit=0.0; float mat=1.0;",
-"  float stepK=(uMix>0.001&&uMix<0.999)?0.70:0.92;",
-"  for(int i=0;i<64;i++){",
+"  float stepK=(uMix>0.001&&uMix<0.999)?0.66:0.88;",
+"  for(int i=0;i<80;i++){",
 "    vec3 p=ro+rd*t;",
 "    vec2 h=map(p);",
 "    if(h.x<0.0007*t){ hit=1.0; mat=h.y; break; }",
 "    t+=h.x*stepK;",
 "    if(t>tOut) break;",
 "  }",
-
 "  if(hit<0.5){ gl_FragColor=vec4(0.0); return; }",
-
+"",
 "  vec3 p=ro+rd*t;",
 "  vec3 n=calcNormal(p);",
-"  vec3 po=w2o(p)/uScale;",
-
-"  vec3 key=normalize(vec3(-0.55,0.92,0.62));",
-"  vec3 rim=normalize(vec3(0.75,0.18,-0.70));",
+"  vec3 po=w2o(p-vec3(0.0,uOffY,0.0))/uScale;",
+"",
+"  vec3 key=normalize(vec3(cos(uKeyEl)*sin(uKeyAz),sin(uKeyEl),cos(uKeyEl)*cos(uKeyAz)));",
+"  vec3 rim=normalize(vec3(-key.x,0.18,-key.z));",
 "  vec3 fil=normalize(vec3(0.60,0.30,0.72));",
-
+"",
 "  float sha=softShadow(p+n*0.02,key);",
 "  float ao=calcAO(p,n);",
-
+"",
+"  vec3 top=mix(uTopA,uTopB,uMix);",
+"  vec3 bot=mix(uBotA,uBotB,uMix);",
+"  vec3 acc=mix(uAccA,uAccB,uMix);",
 "  float hgt=mix(hatH(uA),hatH(uB),uMix);",
-"  vec3 base=mix(uBot,uTop,smoothstep(-0.14,1.02,po.y/hgt));",
-"  float rough=0.155;",
-"  if(mat>1.5){ base=uAcc; rough=0.11; }",
-
+"  vec3 base=mix(bot,top,smoothstep(-0.14,1.02,po.y/hgt));",
+"  float rough=uRough;",
+"  if(mat>1.5){ base=acc; rough=uRough*0.6; }",
+"",
 "  float ndl=max(dot(n,key),0.0);",
 "  float ndv=max(dot(n,-rd),0.0);",
 "  vec3 hv=normalize(key-rd);",
@@ -1200,29 +1296,32 @@
 "  float spec=pow(ndh,mix(40.0,900.0,1.0-rough));",
 "  float coat=pow(ndh,2400.0);",
 "  float fres=pow(1.0-ndv,4.5);",
-
-"  vec3 refl=o2w(reflect(rd,n));",
-"  vec3 env=envCol(refl);",
+"",
+"  vec3 env=envCol(o2w(reflect(rd,n)));",
 "  vec3 amb=envCol(o2w(n));",
-
-"  vec3 col=base*(0.30*amb+vec3(0.92)*ndl*sha*0.78);",
+"",
+"  vec3 col=base*(0.30*amb+vec3(0.92)*ndl*sha*0.78*uKeyPow);",
 "  col+=base*max(dot(n,fil),0.0)*0.22;",
-"  col+=env*(0.075+0.36*fres);",
-"  col+=vec3(1.0,0.99,1.0)*spec*sha*1.15;",
-"  col+=vec3(1.0)*coat*sha*0.7;",
-"  col+=vec3(0.66,0.55,1.35)*pow(max(dot(n,rim),0.0),2.4)*0.50;",
+"  col+=env*(0.075+0.36*fres)*uEnv;",
+"  col+=vec3(1.0,0.99,1.0)*spec*sha*1.15*uKeyPow;",
+"  col+=vec3(1.0)*coat*sha*0.7*uKeyPow;",
+"  col+=mix(bot,top,0.7)*pow(max(dot(n,rim),0.0),2.4)*uRim;",
 "  col*=mix(0.55,1.0,ao);",
-
+"",
 "  col=aces(col*1.02);",
 "  col=pow(col,vec3(1.0/2.2));",
 "  gl_FragColor=vec4(col,1.0);",
 "}"
   ].join("\n");
 
+  /* имена всех значений, которые шейдер принимает снаружи */
+  var NAMES = ["uRes","uTime","uSpin","uTiltX","uTiltZ","uA","uB","uMix","uScale","uOffY",
+    "uTopA","uBotA","uAccA","uTopB","uBotB","uAccB",
+    "uRough","uEnv","uRim","uKeyAz","uKeyEl","uKeyPow","uCamEl","uFocal"];
+
   function compile(gl, type, src){
     var s = gl.createShader(type);
-    gl.shaderSource(s, src);
-    gl.compileShader(s);
+    gl.shaderSource(s, src); gl.compileShader(s);
     if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)){
       if(global.console && console.warn) console.warn(gl.getShaderInfoLog(s));
       return null;
@@ -1230,149 +1329,156 @@
     return s;
   }
 
-  function hexToRgb(h){
-    h = String(h||"").trim().replace("#","");
-    if(h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
-    var n = parseInt(h, 16);
+  function lin(hex){
+    hex = String(hex||"").trim().replace("#","");
+    if(hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+    var n = parseInt(hex,16);
     if(isNaN(n)) return [0.5,0.5,0.5];
-    /* в линейное пространство: свет складывается там, а не в sRGB */
-    return [((n>>16)&255)/255, ((n>>8)&255)/255, (n&255)/255].map(function(c){
-      return Math.pow(c, 2.2);
+    return [((n>>16)&255)/255,((n>>8)&255)/255,(n&255)/255].map(function(c){
+      return Math.pow(c,2.2);
     });
   }
 
-  function create(canvas, opts){
-    opts = opts || {};
+  function create(canvas){
     var gl = null;
     try{
-      var attrs = {alpha:true, premultipliedAlpha:false, antialias:false,
-        depth:false, stencil:false, powerPreference:"low-power",
-        failIfMajorPerformanceCaveat:false};
-      gl = canvas.getContext("webgl", attrs) || canvas.getContext("experimental-webgl", attrs);
+      var at = {alpha:true,premultipliedAlpha:false,antialias:false,depth:false,
+        stencil:false,powerPreference:"low-power",
+        preserveDrawingBuffer:false};
+      gl = canvas.getContext("webgl",at) || canvas.getContext("experimental-webgl",at);
     }catch(e){ gl = null; }
     if(!gl) return null;
-
     var vs = compile(gl, gl.VERTEX_SHADER, VERT);
     var fs = compile(gl, gl.FRAGMENT_SHADER, FRAG);
     if(!vs || !fs) return null;
-    var prog = gl.createProgram();
-    gl.attachShader(prog, vs); gl.attachShader(prog, fs);
-    gl.bindAttribLocation(prog, 0, "a");
-    gl.linkProgram(prog);
-    if(!gl.getProgramParameter(prog, gl.LINK_STATUS)) return null;
-    gl.useProgram(prog);
-
+    var pr = gl.createProgram();
+    gl.attachShader(pr,vs); gl.attachShader(pr,fs);
+    gl.bindAttribLocation(pr,0,"a"); gl.linkProgram(pr);
+    if(!gl.getProgramParameter(pr,gl.LINK_STATUS)) return null;
+    gl.useProgram(pr);
     var buf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
 
     var U = {};
-    ["uRes","uTime","uSpin","uTiltX","uTiltZ","uA","uB","uMix","uScale","uTop","uBot","uAcc"]
-      .forEach(function(k){ U[k] = gl.getUniformLocation(prog, k); });
-
-    var top = hexToRgb(opts.top || "#9B7BFF");
-    var bot = hexToRgb(opts.bot || "#2C6BF0");
-    var acc = hexToRgb(opts.acc || "#DCD3FF");
-    gl.uniform3f(U.uTop, top[0], top[1], top[2]);
-    gl.uniform3f(U.uBot, bot[0], bot[1], bot[2]);
-    gl.uniform3f(U.uAcc, acc[0], acc[1], acc[2]);
+    NAMES.forEach(function(k){ U[k] = gl.getUniformLocation(pr,k); });
 
     var api = {
-      count: 4,
-      spin: 0.55,
-      a: 0, b: 1, mix: 0,
-      scale: 1,
-      dead: false
+      spin:0.55, tiltX:-0.045, tiltZ:0, a:0, b:1, mix:0, scale:1, offY:0,
+      topA:"#9B7BFF", botA:"#2C6BF0", accA:"#C3B6F0",
+      topB:"#9B7BFF", botB:"#2C6BF0", accB:"#C3B6F0",
+      rough:0.155, env:1, rim:0.5,
+      keyAz:-0.62, keyEl:0.92, keyPow:1, camEl:0.20, focal:3.85
     };
-
-    api.resize = function(cssW, cssH, ratio){
-      var s = ratio || Math.min(3, Math.max(2, global.devicePixelRatio || 1));
-      var w = Math.max(1, Math.round(cssW * s));
-      var h = Math.max(1, Math.round(cssH * s));
-      if(canvas.width !== w || canvas.height !== h){
-        canvas.width = w; canvas.height = h;
-      }
-      gl.viewport(0, 0, w, h);
-      gl.uniform2f(U.uRes, w, h);
+    api.resize = function(w,h,ratio){
+      var s = ratio || Math.min(2, Math.max(1, global.devicePixelRatio||1));
+      var W = Math.max(1,Math.round(w*s)), H = Math.max(1,Math.round(h*s));
+      if(canvas.width!==W||canvas.height!==H){ canvas.width=W; canvas.height=H; }
+      gl.viewport(0,0,W,H);
+      gl.uniform2f(U.uRes,W,H);
     };
-
     api.draw = function(time){
-      gl.uniform1f(U.uTime, time);
-      gl.uniform1f(U.uSpin, api.spin);
-      gl.uniform1f(U.uTiltX, -0.045 + 0.030 * Math.sin(time * 0.47));
-      gl.uniform1f(U.uTiltZ, 0.028 * Math.sin(time * 0.61 + 1.1));
-      gl.uniform1f(U.uA, api.a);
-      gl.uniform1f(U.uB, api.b);
-      gl.uniform1f(U.uMix, api.mix);
-      gl.uniform1f(U.uScale, api.scale);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      var c;
+      gl.uniform1f(U.uTime,time||0);
+      gl.uniform1f(U.uSpin,api.spin);
+      gl.uniform1f(U.uTiltX,api.tiltX);
+      gl.uniform1f(U.uTiltZ,api.tiltZ);
+      gl.uniform1f(U.uA,api.a); gl.uniform1f(U.uB,api.b);
+      gl.uniform1f(U.uMix,api.mix); gl.uniform1f(U.uScale,api.scale);
+      gl.uniform1f(U.uOffY,api.offY);
+      c=lin(api.topA); gl.uniform3f(U.uTopA,c[0],c[1],c[2]);
+      c=lin(api.botA); gl.uniform3f(U.uBotA,c[0],c[1],c[2]);
+      c=lin(api.accA); gl.uniform3f(U.uAccA,c[0],c[1],c[2]);
+      c=lin(api.topB); gl.uniform3f(U.uTopB,c[0],c[1],c[2]);
+      c=lin(api.botB); gl.uniform3f(U.uBotB,c[0],c[1],c[2]);
+      c=lin(api.accB); gl.uniform3f(U.uAccB,c[0],c[1],c[2]);
+      gl.uniform1f(U.uRough,api.rough);
+      gl.uniform1f(U.uEnv,api.env);
+      gl.uniform1f(U.uRim,api.rim);
+      gl.uniform1f(U.uKeyAz,api.keyAz);
+      gl.uniform1f(U.uKeyEl,api.keyEl);
+      gl.uniform1f(U.uKeyPow,api.keyPow);
+      gl.uniform1f(U.uCamEl,api.camEl);
+      gl.uniform1f(U.uFocal,api.focal);
+      gl.drawArrays(gl.TRIANGLES,0,3);
     };
-
     api.lost = function(){ return gl.isContextLost(); };
-
+    api.dead = false;
     api.dispose = function(){
       api.dead = true;
-      try{
-        var ext = gl.getExtension("WEBGL_lose_context");
-        if(ext) ext.loseContext();
-      }catch(e){}
+      try{ var e=gl.getExtension("WEBGL_lose_context"); if(e) e.loseContext(); }catch(x){}
     };
     return api;
   }
 
-  /* Живой слой: вращение, смена типов и реакция на касание.
-     Собран отдельно от рендера, чтобы правила движения читались без шейдера. */
+  /* Как выглядит и как движется каждый убор.
+
+     Числа подобраны в мастерской (tune.html): она же их и выдаёт, так что
+     менять внешний вид надо здесь, а не в шейдере. Скорость, качание и
+     неровность у всех разные - от одинакового вращения строй мёртвый. */
+  var LOOK = [
+    {top:"#836feb", bot:"#3e5fcc", acc:"#c9c5dd", spd:0.220, wob:0.0200, ecc:0.100},
+    {top:"#eb6feb", bot:"#7a3ecc", acc:"#ddc5dd", spd:0.373, wob:0.0728, ecc:0.285},
+    {top:"#aa6feb", bot:"#3e4acc", acc:"#d1c5dd", spd:0.526, wob:0.0557, ecc:0.130},
+    {top:"#eb6fc5", bot:"#a83ecc", acc:"#ddc5d6", spd:0.278, wob:0.0385, ecc:0.315},
+    {top:"#d26feb", bot:"#5e3ecc", acc:"#d8c5dd", spd:0.431, wob:0.0214, ecc:0.159},
+    {top:"#926feb", bot:"#3e5fcc", acc:"#ccc5dd", spd:0.584, wob:0.0742, ecc:0.344},
+    {top:"#eb6fdd", bot:"#8b3ecc", acc:"#ddc5da", spd:0.337, wob:0.0570, ecc:0.189},
+    {top:"#ba6feb", bot:"#423ecc", acc:"#d3c5dd", spd:0.490, wob:0.0399, ecc:0.374}
+  ];
+
+  /* Живой слой: вращение, смена уборов и отклик на касание. */
   function attach(host, opts){
     opts = opts || {};
     if(!host || !global.WebGLRenderingContext) return null;
 
-    var canvas = document.createElement("canvas");
+    var canvas = global.document.createElement("canvas");
     canvas.className = "h3d";
     canvas.setAttribute("aria-hidden", "true");
-    var r = create(canvas, opts);
+    var r = create(canvas);
     if(!r) return null;
     host.appendChild(canvas);
 
-    var count = opts.count || 4;
-    var wait = (opts.interval || 2700) / 1000;
-    var MORPH = 0.78;
+    var COUNT = LOOK.length;
+    var HOLD_LO = 2.4, HOLD_HI = 4.2, MORPH = 0.78;
 
     var reduced = false;
     try{ reduced = global.matchMedia("(prefers-reduced-motion:reduce)").matches; }catch(e){}
 
-    var idx = opts.start || 0;
-    var nxt = (idx + 1) % count;
-    r.a = idx; r.b = nxt; r.mix = 0;
+    var cur = 0, nxt = 1;
+    var acc = 0, morph = -1, clock = 0, hold = HOLD_LO;
+    var extra = 0, pop = 0;
+    var raf = 0, last = 0, alive = true, idle = false;
 
-    var acc = 0, morph = -1, extra = 0, pop = 0, clock = 0;
-    var raf = 0, last = 0, alive = true;
     /* Качество снижаем ступенями: лучше потерять резкость, чем плавность.
        Меряем не один раз на старте, а окнами - телефон греется и слабеет. */
     var TIERS = [2, 1.5, 1.15];
     var tier = 0;
     var ratio = Math.min(TIERS[0], Math.max(1, global.devicePixelRatio || 1));
-    var probes = 0, slow = 0, cw = 0, ch = 0, minGap = 0, skip = 0, idle = false;
+    var probes = 0, slow = 0, minGap = 0, skip = 0;
 
-    function fit(){
-      var w = host.clientWidth || 128;
-      var h = host.clientHeight || w;
-      if(w !== cw || h !== ch){ cw = w; ch = h; }
-      r.resize(w, h, ratio);
+    function pickHold(){ return HOLD_LO + Math.random() * (HOLD_HI - HOLD_LO); }
+
+    function paint(){
+      var a = LOOK[cur], b = LOOK[nxt];
+      r.a = cur; r.b = nxt;
+      r.topA = a.top; r.botA = a.bot; r.accA = a.acc;
+      r.topB = b.top; r.botB = b.bot; r.accB = b.acc;
     }
 
+    function fit(){
+      r.resize(host.clientWidth || 128, host.clientHeight || host.clientWidth || 128, ratio);
+    }
     function visible(){
       if(!alive || r.dead) return false;
       if(global.document && global.document.hidden) return false;
       return host.offsetParent !== null;
     }
-
     function startSwitch(){
       if(morph >= 0) return;
-      morph = 0;
-      nxt = (idx + 1) % count;
-      r.a = idx; r.b = nxt;
+      morph = 0; nxt = (cur + 1) % COUNT; paint();
     }
 
     function step(now){
@@ -1402,24 +1508,34 @@
 
       extra *= Math.exp(-dt * 3.4);
       pop *= Math.exp(-dt * 5.2);
-      if(!reduced) r.spin += (0.40 + extra) * dt;
-      else r.spin += extra * dt;
 
-      acc += dt;
-      if(morph < 0 && !reduced && acc >= wait) startSwitch();
+      var e = morph < 0 ? 0 : morph * morph * (3 - 2 * morph);
+      var A = LOOK[cur], B = LOOK[nxt];
+      var spd = A.spd * (1 - e) + B.spd * e;
+      var wob = A.wob * (1 - e) + B.wob * e;
+      var ecc = A.ecc * (1 - e) + B.ecc * e;
+      var ph = cur * 1.73;
+
+      if(!reduced) r.spin += dt * (spd * (1 + ecc * Math.sin(clock * 0.63 + ph)) + extra);
+      else r.spin += dt * extra;
+
+      r.tiltX = -0.045 + (reduced ? 0 : wob * Math.sin(clock * 0.47 + ph));
+      r.tiltZ = reduced ? 0 : wob * 0.75 * Math.sin(clock * 0.61 + ph * 1.3);
 
       var breath = 0;
       if(morph >= 0){
         morph += dt / MORPH;
         if(morph >= 1){
-          idx = nxt; nxt = (idx + 1) % count;
-          morph = -1; acc = 0;
-          r.a = idx; r.b = nxt; r.mix = 0;
+          cur = nxt; nxt = (cur + 1) % COUNT;
+          morph = -1; acc = 0; hold = pickHold();
+          r.mix = 0; paint();
         }else{
-          var e = morph * morph * (3 - 2 * morph);
           r.mix = e;
           breath = Math.sin(Math.PI * morph);
         }
+      }else{
+        acc += dt;
+        if(!reduced && acc >= hold) startSwitch();
       }
       r.scale = (1 - 0.06 * breath) * (1 + 0.11 * pop);
 
@@ -1443,18 +1559,16 @@
     }
 
     function start(){
-      if(raf || !alive) return;
-      if(!visible()) return;
-      fit();
-      last = 0;
+      if(raf || !alive || !visible()) return;
+      fit(); last = 0;
       raf = global.requestAnimationFrame(step);
     }
     function stop(){
       if(raf) global.cancelAnimationFrame(raf);
       raf = 0;
     }
-
     function onVis(){ if(visible()) start(); else stop(); }
+
     if(global.document) global.document.addEventListener("visibilitychange", onVis);
     global.addEventListener("resize", fit);
     canvas.addEventListener("webglcontextlost", function(ev){
@@ -1462,14 +1576,18 @@
       if(opts.onLost) opts.onLost();
     });
 
+    hold = pickHold();
+    paint();
     fit();
+    /* первый кадр рисуем сразу: экран не должен ждать следующего тика */
+    r.draw(0);
     start();
 
     return {
       el: canvas,
-      index: function(){ return idx; },
+      count: COUNT,
       next: function(){ startSwitch(); acc = 0; },
-      bump: function(){ extra += 4.6; pop = 1; startSwitch(); acc = 0; },
+      bump: function(){ extra += 4.6; pop = 1; idle = false; startSwitch(); acc = 0; },
       poke: start,
       dispose: function(){
         alive = false; stop();
@@ -1576,7 +1694,7 @@ var TELEGRAM_URL = "https://t.me/gentlemad";
 /* Номер версии правится руками при выпуске, вместе с записью в
    docs/CHANGELOG.md. Отметку сборки к нему приклеивает build.js: по версии
    понятно, что человек видел, по дате - какая именно сборка у него открыта. */
-var VERSION = "0.11";
+var VERSION = "0.12";
 var BUILD = "dev";
 var FB_STORE = "shlyapa.fb.v1";
 var FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
@@ -1716,10 +1834,6 @@ var HATS = [
   hw('<path d="M32 8l13 34H19z" fill="currentColor" fill-opacity=".14"/><path d="M32 8l13 34H19z"/>'+
      '<path d="M14 46c0-2.4 8-4 18-4s18 1.6 18 4-8 4-18 4-18-1.6-18-4z"/>'+
      '<circle cx="32" cy="7" r="3.4" fill="currentColor"/><path d="M25 30h14M28 21h8"/>'),
-  /* корона */
-  hw('<path d="M12 44V20l10 8 10-14 10 14 10-8v24z" fill="currentColor" fill-opacity=".14"/>'+
-     '<path d="M12 44V20l10 8 10-14 10 14 10-8v24z"/><path d="M12 50h40"/>'+
-     '<circle cx="22" cy="34" r="2" fill="currentColor"/><circle cx="32" cy="32" r="2" fill="currentColor"/><circle cx="42" cy="34" r="2" fill="currentColor"/>'),
   /* кепка */
   hw('<path d="M14 36a18 18 0 0 1 36 0z" fill="currentColor" fill-opacity=".14"/><path d="M14 36a18 18 0 0 1 36 0z"/>'+
      '<path d="M50 36h4c3 0 5 2 5 5s-2 5-5 5H14a4 4 0 0 1 0-10h36z"/><path d="M32 18v18"/>')
@@ -2310,11 +2424,12 @@ function bindSeg(id, cb){
 /* ============================================================
    ЭКРАНЫ
    ============================================================ */
-var hatTimer=null, hatIdx=0, hat3d=null;
+var hatTimer=null, hatIdx=0, hat3d=null, hatWait=null;
 function mountHats(){
   var host=byId("hatstack");
   if(!host) return;
   if(hat3d){ hat3d.dispose(); hat3d=null; }
+  clearTimeout(hatWait); hatWait=null;
   host.classList.remove("on3d");
   host.innerHTML = HATS.map(function(h,i){
     return '<span class="hi'+(i===0?" on":"")+'">'+h+'</span>';
@@ -2326,20 +2441,21 @@ function mountHats(){
   mountHats3D(host);
 }
 
-/* Объём подключается после того, как экран уже нарисован: открытие главного
-   не ждёт ни байта, плоские значки видны сразу, а если WebGL недоступен или
-   контекст потерян - они же и остаются. Запасной путь убирать нельзя. */
+/* Объём поднимается сразу после отрисовки экрана. Плоские значки на это
+   время придержаны классом wait: показать их и через долю секунды подменить
+   объёмом - заметно и выглядит как сбой. Если объём не встал за 340 мс
+   (нет WebGL, медленная сборка шейдера), значки проявляются и остаются. */
 function mountHats3D(host){
   if(!window.Hat3D) return;
-  var css = getComputedStyle(document.documentElement);
-  function v(name, dflt){
-    var x = (css.getPropertyValue(name) || "").trim();
-    return x || dflt;
-  }
   var lost = false;
+  host.classList.add("wait");
+  hatWait = setTimeout(function(){ host.classList.remove("wait"); }, 340);
+
   function drop(){
     lost = true;
+    clearTimeout(hatWait); hatWait=null;
     host.classList.remove("on3d");
+    host.classList.remove("wait");
     hat3d = null;
     var cv = host.querySelector("canvas.h3d");
     if(cv && cv.parentNode) cv.parentNode.removeChild(cv);
@@ -2347,26 +2463,21 @@ function mountHats3D(host){
     hatTimer = setInterval(nextHat, 2700);
   }
   function go(){
-    /* Пока ждали простоя, экран могли сменить и вернуть: тогда на главном
+    /* Пока ждали кадр, экран могли сменить и вернуть: тогда на главном
        живёт уже другой узел, а этот оторван от документа. Рисовать в него -
        значит погасить значки на живом экране и не показать ничего взамен. */
     if(hat3d || byId("hatstack") !== host) return;
-    var ctl = window.Hat3D.attach(host, {
-      count: HATS.length,
-      interval: 2700,
-      top: v("--hat-top", "#9B7BFF"),
-      bot: v("--hat-bot", "#2C6BF0"),
-      acc: v("--hat-acc", "#C3B6F0"),
-      onLost: drop
-    });
+    var ctl = window.Hat3D.attach(host, {onLost: drop});
     /* контекст мог отвалиться прямо в момент создания */
     if(!ctl || lost){ if(ctl) ctl.dispose(); return; }
     hat3d = ctl;
+    clearTimeout(hatWait); hatWait=null;
     clearInterval(hatTimer); hatTimer = null;
+    host.classList.remove("wait");
     host.classList.add("on3d");
   }
-  if(window.requestIdleCallback) requestIdleCallback(go, {timeout:700});
-  else setTimeout(go, 140);
+  if(window.requestAnimationFrame) requestAnimationFrame(go);
+  else setTimeout(go, 16);
 }
 function nextHat(){
   if(hat3d){ hat3d.next(); return; }
