@@ -80,25 +80,104 @@
   #app{position:relative;flex:1;min-height:0;min-width:0;display:flex;flex-direction:column;background:var(--surface)}
   /* слой точек и баннер согласия исключены: иначе id-селектор сбивал бы им
      position на relative, и оба перестали бы держаться за края экрана */
-  #app > *:not(.dotlayer):not(.consent){position:relative;z-index:1}
-  /* Мягкие пятна вне партии: главная, настройка, ввод слов. До 0.9 фон здесь
-     был ровным, и это не мешало - точки были одинаково бледными везде. Со
-     свечением ровное белое читается как пустота.
-     Отдельным слоем, а не background-image: силу удобно крутить одной
-     непрозрачностью, и слой ложится под точки, но над заливкой корпуса.
-     Первая версия была вдвое слабее и давала на краю 15 единиц из 255 -
-     разницу не получалось заметить, даже переключая её нарочно. */
-  #app.calm::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
-    opacity:var(--calm,.7);
-    background-image:
-      radial-gradient(circle at 18% 10%, rgba(90,169,247,.32), rgba(90,169,247,0) 52%),
-      radial-gradient(circle at 84% 88%, rgba(122,90,245,.23), rgba(122,90,245,0) 50%)}
-  /* мягкие пятна под партией */
-  #app.playing{
-    background-image:
-      radial-gradient(circle at 16% 14%, rgba(90,169,247,.15), rgba(90,169,247,0) 46%),
-      radial-gradient(circle at 86% 84%, rgba(31,111,235,.12), rgba(31,111,235,0) 44%)}
+  #app > *:not(.dotlayer):not(.mesh):not(.consent){position:relative;z-index:1}
+  /* ================= ПЛАВАЮЩИЙ ЦВЕТНОЙ ФОН =================
+     Мягкие цветные пятна под всем приложением - и вне партии, и на ходу.
+     Живут у верхней и нижней кромки: середина экрана остаётся светлой,
+     иначе текст карточки и заголовки начинают спорить с фоном.
+
+     Двигается только transform и opacity, поэтому всё считает композитор,
+     а не процессор: слой не перерисовывается ни на одном кадре. Мягкость
+     даёт radial-gradient, а не filter:blur - размытие пришлось бы
+     пересчитывать при каждом сдвиге.
+
+     Периоды взаимно непропорциональны и заметно длиннее, чем у светящихся
+     пятен на холсте (23-37 с): иначе два слоя движутся в такт и читаются
+     как один. */
+  #app > .mesh{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden;
+    opacity:var(--calm,.7)}
+  #app > .mesh i{position:absolute;display:block;border-radius:50%;
+    will-change:transform,opacity}
   #app.playing .ctx{background:transparent}
+
+  /* --- Вариант 1: два облака. Одно вверху, одно внизу, расходятся вбок --- */
+  .mesh.m1 .b1{left:-28%;top:-40%;width:156%;height:76%;
+    background:radial-gradient(closest-side,rgba(90,169,247,.46),rgba(90,169,247,0));
+    animation:meshA 37s ease-in-out infinite, meshFade 23s ease-in-out infinite}
+  .mesh.m1 .b2{left:-22%;bottom:-42%;width:150%;height:80%;
+    background:radial-gradient(closest-side,rgba(122,90,245,.38),rgba(122,90,245,0));
+    animation:meshB 53s ease-in-out infinite, meshFade 31s ease-in-out infinite -7s}
+  .mesh.m1 .b3,.mesh.m1 .b4{display:none}
+
+  /* --- Вариант 2: мозаика. Четыре пятна, по два у каждой кромки --- */
+  .mesh.m2 i{width:104%;height:58%}
+  .mesh.m2 .b1{left:-34%;top:-26%;
+    background:radial-gradient(closest-side,rgba(90,169,247,.44),rgba(90,169,247,0));
+    animation:meshA 41s ease-in-out infinite, meshFade 26s ease-in-out infinite}
+  .mesh.m2 .b2{right:-32%;top:-30%;
+    background:radial-gradient(closest-side,rgba(122,90,245,.40),rgba(122,90,245,0));
+    animation:meshB 59s ease-in-out infinite, meshFade 34s ease-in-out infinite -11s}
+  .mesh.m2 .b3{left:-30%;bottom:-28%;
+    background:radial-gradient(closest-side,rgba(31,111,235,.34),rgba(31,111,235,0));
+    animation:meshC 47s ease-in-out infinite, meshFade 29s ease-in-out infinite -5s}
+  .mesh.m2 .b4{right:-34%;bottom:-32%;
+    background:radial-gradient(closest-side,rgba(90,169,247,.42),rgba(90,169,247,0));
+    animation:meshD 61s ease-in-out infinite, meshFade 37s ease-in-out infinite -17s}
+
+  /* --- Вариант 3: прилив. Широкие полосы дышат от кромок к середине --- */
+  .mesh.m3 i{left:-20%;width:140%;height:64%}
+  .mesh.m3 .b1{top:-30%;
+    background:radial-gradient(closest-side,rgba(90,169,247,.48),rgba(90,169,247,0));
+    animation:meshTideA 43s ease-in-out infinite, meshFade 27s ease-in-out infinite}
+  .mesh.m3 .b2{bottom:-32%;
+    background:radial-gradient(closest-side,rgba(122,90,245,.40),rgba(122,90,245,0));
+    animation:meshTideB 67s ease-in-out infinite, meshFade 33s ease-in-out infinite -9s}
+  .mesh.m3 .b3,.mesh.m3 .b4{display:none}
+
+  /* --- Вариант 0: неподвижно, как в 0.10 --- */
+  .mesh.m0 i{animation:none}
+  .mesh.m0 .b1{left:-28%;top:-40%;width:156%;height:76%;
+    background:radial-gradient(closest-side,rgba(90,169,247,.44),rgba(90,169,247,0))}
+  .mesh.m0 .b2{left:-22%;bottom:-42%;width:150%;height:80%;
+    background:radial-gradient(closest-side,rgba(122,90,245,.36),rgba(122,90,245,0))}
+  .mesh.m0 .b3,.mesh.m0 .b4{display:none}
+
+  /* Ходы пятен. Сдвиги в процентах от собственного размера, поэтому на
+     любом экране картинка одинаковая. По вертикали ходят мало: пятно не
+     должно заползти в середину. */
+  @keyframes meshA{
+    0%{transform:translate3d(0,0,0) scale(1)}
+    28%{transform:translate3d(7%,-3%,0) scale(1.08)}
+    61%{transform:translate3d(-5%,2%,0) scale(.96)}
+    100%{transform:translate3d(0,0,0) scale(1)}}
+  @keyframes meshB{
+    0%{transform:translate3d(0,0,0) scale(1)}
+    34%{transform:translate3d(-8%,3%,0) scale(1.06)}
+    67%{transform:translate3d(6%,-2%,0) scale(.94)}
+    100%{transform:translate3d(0,0,0) scale(1)}}
+  @keyframes meshC{
+    0%{transform:translate3d(0,0,0) scale(1)}
+    31%{transform:translate3d(9%,2%,0) scale(.95)}
+    58%{transform:translate3d(-4%,-3%,0) scale(1.09)}
+    100%{transform:translate3d(0,0,0) scale(1)}}
+  @keyframes meshD{
+    0%{transform:translate3d(0,0,0) scale(1)}
+    26%{transform:translate3d(-6%,-2%,0) scale(1.07)}
+    63%{transform:translate3d(8%,3%,0) scale(.93)}
+    100%{transform:translate3d(0,0,0) scale(1)}}
+  @keyframes meshTideA{
+    0%{transform:translate3d(0,0,0) scale(1)}
+    50%{transform:translate3d(4%,4%,0) scale(1.14)}
+    100%{transform:translate3d(0,0,0) scale(1)}}
+  @keyframes meshTideB{
+    0%{transform:translate3d(0,0,0) scale(1)}
+    50%{transform:translate3d(-5%,-4%,0) scale(1.12)}
+    100%{transform:translate3d(0,0,0) scale(1)}}
+  /* Дыхание непрозрачности: край то наливается цветом, то отпускает.
+     Границы 0.6 и 0.8 - от силы слоя, а не от нуля: пятно не должно
+     пропадать совсем, иначе движение читается как мигание. */
+  @keyframes meshFade{
+    0%{opacity:.62} 50%{opacity:.8} 100%{opacity:.62}}
 
   /* Точки живут отдельным слоем: холст во всю площадь экрана приложения.
      Точки не просто дрейфуют — по ним ходят светящиеся пятна, и каждая
@@ -765,7 +844,7 @@
     .card,.kb,.hatstack .hi{transition:none}
     .plusone,.streak,.winner .cup,.fmt b.pop,.hero,.lastgame,.homebtns,
     .dotlayer,.screen.enter,.overlay,.mood,.radarpoly,
-    .dphone,.dword,.dcard,.dplus,.dmode,.dscore,.toast,
+    .dphone,.dword,.dcard,.dplus,.dmode,.dscore,.toast,.mesh i,
     .hintbox,.hintbox.lit,.hintbox .hl,.hintbox .hl.blink,.hintbox .hq.in{animation:none}
     /* перечислены поимённо: у .dwbg .bN специфичность выше, чем у .dwbg i */
     .deskwall .dwbg .b1,.deskwall .dwbg .b2,
@@ -803,6 +882,7 @@
         </div>
 
         <div id="app">
+          <div class="mesh m1" id="mesh" aria-hidden="true"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i></div>
           <canvas class="dotlayer" id="dots" hidden aria-hidden="true"></canvas>
           <div id="bar"></div>
           <div class="progbar" id="progbar"><i id="prog"></i></div>
@@ -3356,7 +3436,6 @@ function go(){
   var playing = ["handoff","turn","review"].indexOf(S.phase) >= 0;
   var lit = playing || S.phase === "home";
   byId("app").classList.toggle("playing", playing);
-  byId("app").classList.toggle("calm", !playing);
   dotsOn(lit);
   if(S.phase !== "home"){ clearInterval(hatTimer); hatTimer = null; }
   if(S.phase !== "entry") stopHints();
