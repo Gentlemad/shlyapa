@@ -87,7 +87,7 @@
   .devlist{overflow-y:auto;max-height:330px;padding:4px}
   /* Разделитель этапа: подпись прижата к левому краю, линия добирает остаток */
   .devgrp{display:flex;align-items:center;gap:7px;padding:9px 7px 5px}
-  .devgrp span{flex:none;font-family:var(--mono);font-size:9px;letter-spacing:.14em;
+  .devgrp span{flex:none;font-size:9px;font-weight:700;letter-spacing:.14em;
     text-transform:uppercase;color:var(--faint)}
   .devgrp:after{content:"";flex:1;height:1px;background:rgba(59,69,83,.14)}
   .devitem{display:flex;align-items:center;gap:8px;width:100%;border:0;background:none;
@@ -345,7 +345,7 @@
      пауза, список игроков и форма отзыва лежат поверх всего. С большим
      значением баннер перехватывал нажатия на кнопку отправки в форме отзыва
      у того, кто ещё не ответил на вопрос про cookie. */
-  .consent{--cgap:11px;--cglow:80px;position:absolute;left:0;right:0;bottom:0;
+  .consent{--cgap:11px;--cglow:120px;position:absolute;left:0;right:0;bottom:0;
     z-index:15;padding:0 var(--cgap) var(--cgap);pointer-events:none}
   /* Градиент гасит контент над карточкой и уводит взгляд вниз. Тянется выше
      самой карточки, поэтому лежит в псевдоэлементе, а не в фоне. */
@@ -393,13 +393,26 @@
   .askothers{font-size:12px;line-height:1.4;color:var(--faint)}
   /* Пустая строка статуса схлопывается совсем: display:none убирает её и из
      раскладки флекса, поэтому зазор под полем не остаётся про запас. */
+  /* Колесо на кнопке: долгую операцию показываем там, где её запустили */
+  .spin{display:inline-block;width:15px;height:15px;flex:none;border-radius:50%;
+    border:2px solid currentColor;border-top-color:transparent;
+    animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
   .fbstatus{font-size:13px}
   .fbstatus:empty{display:none}
   .fbstatus.bad{color:var(--danger)}
   .fbstatus.ok{color:var(--ok)}
-  /* Экран после отправки: отзыв ушёл, но дверь остаётся открытой */
-  .fbdone{flex:1;display:flex;flex-direction:column;align-items:center;
-    justify-content:center;gap:11px;text-align:center;padding:22px 8px}
+  /* Экран после отправки: отзыв ушёл, но дверь остаётся открытой.
+     Градиент взят той же формы, что у победного блока: мягкая заливка
+     сверху, растворяющаяся вниз - в продукте это язык удачного исхода. */
+  /* min-height, а не flex: .sheetbody - обычный блок с прокруткой, и flex:1
+     на его ребёнке ничего не растягивает. Без высоты центрировать нечего. */
+  .fbdone{min-height:100%;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:11px;text-align:center;padding:22px 8px;
+    background:linear-gradient(180deg, rgba(46,158,116,.16), rgba(46,158,116,0) 64%);
+    animation:doneIn .42s cubic-bezier(.2,.9,.3,1) both}
+  .fbdone .di{animation:pop .5s cubic-bezier(.2,1.35,.4,1) both}
+  @keyframes doneIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
   .fbdone .di{width:54px;height:54px;border-radius:50%;display:grid;
     place-items:center;background:rgba(46,158,116,.12);color:var(--ok)}
   .fbdone .di svg{width:27px;height:27px}
@@ -453,12 +466,15 @@
 
   /* закрепляем только когда экран реально скроллится */
   .actions{margin-top:auto;padding:10px 0 2px;display:flex;flex-direction:column;gap:8px}
+  /* Заливка выходит за поля .pad отрицательными отступами: иначе полоса
+     обрывалась, не доходя до краёв экрана, и это читалось как поломка. */
   .actions.stuck{position:sticky;bottom:0;z-index:5;background:var(--surface);
+    margin-left:-14px;margin-right:-14px;padding-left:14px;padding-right:14px;
     box-shadow:0 -10px 14px -10px rgba(20,24,32,.2);
-    transition:box-shadow .18s ease}
-  /* Докрутили до конца - под кнопкой ничего не спрятано, и тень врёт.
-     Кнопка встаёт как обычный элемент в потоке. */
-  .actions.stuck.atend{box-shadow:none}
+    transition:box-shadow .18s ease, background-color .18s ease}
+  /* Докрутили до конца - под кнопкой ничего не спрятано. Уходит и тень, и
+     заливка: кнопка встаёт как обычный элемент в потоке. */
+  .actions.stuck.atend{box-shadow:none;background:transparent}
   .kbopen .actions.stuck{position:static;box-shadow:none}
 
   .center{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;
@@ -502,7 +518,7 @@
   .card .word{font-size:31px;font-weight:700;letter-spacing:-.02em;line-height:1.12;text-wrap:balance}
   .card .swipehint{display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--faint)}
   .card .swipehint svg{width:18px;height:18px}
-  .card .swipehint span{font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase}
+  .card .swipehint span{font-size:9.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase}
   .turnfoot{flex:none;padding:10px 14px;border-top:1px solid var(--line);display:flex;gap:10px;align-items:center}
   .fmt{flex:1;font-size:12.5px;color:var(--muted)}
   .fmt b{font-family:var(--mono);font-size:15px;color:var(--ink);display:inline-block}
@@ -576,7 +592,7 @@
   .winner .cup{width:82px;height:82px;color:var(--gold);animation:pop .55s cubic-bezier(.2,1.35,.4,1)}
   .winner .wlab{font-size:12px;font-weight:600;color:var(--muted);margin-top:4px}
   .winner .wname{font-size:26px;font-weight:700;letter-spacing:-.02em}
-  .winner .wpts{font-family:var(--mono);font-size:13px;color:var(--muted)}
+  .winner .wpts{font-size:13px;color:var(--muted)}
   @keyframes pop{0%{transform:scale(.4) rotate(-14deg);opacity:0}100%{transform:none;opacity:1}}
 
   .radarwrap{width:100%;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
@@ -2013,7 +2029,8 @@ function surveySend(){
   var note = (byId("sv-text") ? byId("sv-text").value : "").trim().slice(0, FB_MAX);
   var st = byId("sv-status");
   svBusy = true;
-  if(st){ st.className = "fbstatus"; st.textContent = "Отправляем..."; }
+  if(st){ st.className = "fbstatus"; st.textContent = ""; }
+  btnBusy(byId("sv-send"), "Отправляем\u2026");
 
   track("survey_answered", {rate:svRate, comment:!!note, games:fbGames()});
 
@@ -2047,6 +2064,7 @@ function surveySend(){
   }).catch(function(){
     if(timer) clearTimeout(timer);
     svBusy = false;
+    btnIdle(byId("sv-send"), "Отправить");
     var e = byId("sv-status");
     if(e){ e.className = "fbstatus bad"; e.textContent = "Не отправилось. Попробуйте ещё раз"; }
   });
@@ -2142,6 +2160,20 @@ function openFeedback(){
 }
 function closeFeedback(){ kbHide(); byId("o-fb").hidden = true; }
 
+/* Долгую операцию показываем на самой кнопке: колесо и новая подпись.
+   Отдельная строчка "отправляем..." под полем этого не давала - её замечали
+   уже после того, как нажимали кнопку второй раз. */
+function btnBusy(el, text){
+  if(!el) return;
+  el.disabled = true;
+  el.innerHTML = '<span style="display:inline-flex;align-items:center;gap:8px">'+
+    '<span class="spin"></span>'+esc(text)+'</span>';
+}
+function btnIdle(el, text){
+  if(!el) return;
+  el.disabled = false;
+  el.textContent = text;
+}
 function fbStatus(text, cls){
   var el = byId("fb-status");
   if(!el) return;
@@ -2278,8 +2310,8 @@ function sendFeedback(){
   if(wait > 0){ fbStatus("Отзыв только что ушёл, подождите " + num(wait,"секунду","секунды","секунд"), "bad"); return; }
 
   kbHide();
-  b.disabled = true;
-  fbStatus("Отправляем...");
+  fbStatus("");
+  btnBusy(b, "Отправляем\u2026");
 
   /* Демо не шлёт ничего: воркер всё равно отказал бы чужому адресу, и человек
      видел бы "не отправилось" там, где смотрят на вид экрана, а не на связь. */
@@ -2305,7 +2337,7 @@ function sendFeedback(){
     fbSent();
   }).catch(function(){
     if(timer) clearTimeout(timer);
-    b.disabled = false;
+    btnIdle(b, "Отправить");
     /* Текст не стираем и черновик не трогаем: отправить не вышло,
        человек должен иметь возможность скопировать написанное в телеграм. */
     fbStatus(fbTgOn() ? "Не отправилось. Попробуйте ещё раз или напишите в телеграм"
