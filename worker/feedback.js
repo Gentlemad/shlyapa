@@ -83,7 +83,9 @@ export default {
 
     // Оценки или категории достаточно: человек не обязан писать текст
     if (!text && !rate && !kind) return json({ error: "empty" }, 400, cors);
-    if (text && text.length < 5) return json({ error: "too short" }, 400, cors);
+    /* Минимальной длины текста нет намеренно: "тест", "ок" и "супер" - тоже
+       отзывы, и отсекать их значит отсекать людей. Раньше такой отзыв уходил
+       в никуда с ошибкой "слишком коротко". */
 
     if (!env.BOT_TOKEN || !env.CHAT_ID) return json({ error: "not configured" }, 500, cors);
 

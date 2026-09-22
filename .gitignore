@@ -1,3 +1,6 @@
 node_modules/
 .DS_Store
 Thumbs.db
+
+# сборка для обкатки: собирается локально по требованию
+dev.html

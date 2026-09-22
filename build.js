@@ -9,6 +9,11 @@
 
   Запуск: node build.js
 
+  Обкатка: node build.js --dev --artifact --out dev.html
+  Оставляет рельсу состояний: слева (на узком экране - сверху) список из
+  всех экранов игры, тап по любому переносит прямо туда. Так правку видно
+  за один тап, а не за партию целиком.
+
   Превью: node build.js --from dev --out preview.html
   Берёт исходник из указанной ветки, не трогая рабочее дерево, и кладёт
   рядом с боевой страницей. Так обкатанное и необкатанное лежат по разным
@@ -26,6 +31,9 @@ function arg(name){
 }
 const FROM = arg("--from");
 const ARTIFACT = args.indexOf("--artifact") >= 0;
+// --dev оставляет рельсу состояний: по ней можно прыгнуть на любой экран,
+// не проходя партию целиком. Нужна для обкатки правок, в боевую не едет.
+const DEV = args.indexOf("--dev") >= 0;
 const SRC = path.join(__dirname, "src", "shlyapa.html");
 const OUT = path.resolve(__dirname, arg("--out") || "index.html");
 
@@ -61,11 +69,19 @@ function build(){
   const head = src.slice(0, cut + "</style>".length);
   let body = src.slice(cut + "</style>".length);
 
-  // Рельса состояний в боевую версию не едет
-  const before = body.length;
-  body = body.replace(/\s*<aside class="rail">[\s\S]*?<\/aside>/, "");
-  if(body.length === before){
-    console.warn("Предупреждение: блок рельсы не найден, проверьте разметку");
+  // Рельса состояний в боевую версию не едет, но в сборке для обкатки нужна
+  if(!DEV){
+    const before = body.length;
+    body = body.replace(/\s*<aside class="rail"[^>]*>[\s\S]*?<\/aside>/, "");
+    if(body.length === before){
+      console.warn("Предупреждение: блок рельсы не найден, проверьте разметку");
+    }
+    // Кнопка панели лежит вне <aside>, поэтому вырезается отдельно
+    const beforeToggle = body.length;
+    body = body.replace(/\s*<button class="railtoggle"[\s\S]*?<\/button>/, "");
+    if(body.length === beforeToggle){
+      console.warn("Предупреждение: кнопка панели не найдена, проверьте разметку");
+    }
   }
 
   // Фейковая клавиатура - тоже часть корпуса прототипа. На телефоне поле
@@ -74,6 +90,15 @@ function build(){
   body = body.replace(/\s*<div class="kb" id="kb"><\/div>/, "");
   if(body.length === beforeKb){
     console.warn("Предупреждение: блок клавиатуры не найден, проверьте разметку");
+  }
+
+  // Сборка для обкатки ничего не отправляет: прыжки по рельсе - не партии
+  if(DEV){
+    const beforeDev = body.length;
+    body = body.replace("var DEV_BUILD = false;", "var DEV_BUILD = true;");
+    if(body.length === beforeDev){
+      console.warn("Предупреждение: не найдено объявление DEV_BUILD");
+    }
   }
 
   // Отметка сборки едет в отзывы: по ней видно, что за версия и какая сборка
@@ -88,15 +113,21 @@ function build(){
   }
 
   // Артефакт оборачивает страницу в doctype/head/body сам, поэтому отдаём
-  // голый фрагмент - ровно в том виде, в каком исходник и писался. Режим
-  // приложения включаем принудительно: в артефакте нет ?app в адресе.
+  // голый фрагмент - ровно в том виде, в каком исходник и писался.
+  //
+  // Режим приложения включаем принудительно: в артефакте нет ?app в адресе.
+  // Но не в сборке для обкатки: body.appmode прячет рельсу, и состояния
+  // становится нечем переключать. На этом уже попались один раз.
   if(ARTIFACT){
-    const frag = (head + "\n" + body.trim())
-      .replace('if(q.indexOf("app") >= 0) document.body.classList.add("appmode");',
-               'document.body.classList.add("appmode");');
+    const frag = DEV
+      ? (head + "\n" + body.trim())
+      : (head + "\n" + body.trim())
+          .replace('if(q.indexOf("app") >= 0) document.body.classList.add("appmode");',
+                   'document.body.classList.add("appmode");');
     fs.writeFileSync(OUT, frag, "utf8");
     console.log("Готово: " + path.basename(OUT) + ", " +
       (Buffer.byteLength(frag, "utf8") / 1024).toFixed(1) + " КБ (для артефакта" +
+      (DEV ? ", с рельсой состояний" : "") +
       (FROM ? ", исходник из ветки " + FROM : "") + ")");
     return;
   }
@@ -114,7 +145,7 @@ function build(){
 <meta name="robots" content="noindex">
 ${head}
 </head>
-<body class="appmode">
+<body${DEV ? "" : ' class="appmode"'}>
 ${body.trim()}
 </body>
 </html>
