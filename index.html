@@ -740,7 +740,10 @@
   .winner .wpts{font-family:var(--mono);font-size:13px;color:var(--muted)}
   @keyframes pop{0%{transform:scale(.4) rotate(-14deg);opacity:0}100%{transform:none;opacity:1}}
 
-  .radarwrap{width:100%;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+  /* Плюс 8 пикселей к общему шагу колонки: раздел с графиком слишком
+     плотно прилипал к карточкам достижений. */
+  .radarwrap{width:100%;display:flex;flex-direction:column;align-items:center;gap:6px;
+    text-align:center;margin-top:8px}
   .radarwrap svg{margin-inline:auto}
   .radarpoly{transform-origin:50% 50%;animation:radarIn .5s cubic-bezier(.2,1.2,.4,1)}
   @keyframes radarIn{from{transform:scale(.55);opacity:0}to{transform:none;opacity:1}}
@@ -1022,7 +1025,7 @@ var TELEGRAM_URL = "https://t.me/gentlemad";
    docs/CHANGELOG.md. Отметку сборки к нему приклеивает build.js: по версии
    понятно, что человек видел, по дате - какая именно сборка у него открыта. */
 var VERSION = "0.10";
-var BUILD = "0.10 · 2026-09-22 12:50 UTC";
+var BUILD = "0.10 · 2026-09-22 13:01 UTC";
 var FB_STORE = "shlyapa.fb.v1";
 var FB_MIN = 5, FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
 /* Счётчик символов висит на экране без дела: показываем, только когда
@@ -1918,7 +1921,7 @@ function renderStats(){
         /* Радар строится по сохранённым очкам той партии. У старых записей
            players может не быть - тогда раздел просто не показывается. */
         (g.players && g.players.length>=3 && g.scores
-          ? '<div class="radarwrap"><div class="sechead">Итоговый расклад</div>'+
+          ? '<div class="radarwrap"><div class="sechead">Итоговый расклад очков</div>'+
               radarSVG(g.players, g.scores)+'</div>'
           : '')+
         '<div class="spacer"></div>'+
@@ -2989,7 +2992,22 @@ function radarSVG(players, pts){
   if(n<3) return "";
   var m={}; (pts||scores()).forEach(function(s){ m[s.id]=s.pts; });
   var max=Math.max(1, Math.max.apply(null, order.map(function(p){ return m[p.id]||0; })));
-  var W=250,H=210,cx=W/2,cy=H/2+4,R=62,parts=[],labels=[];
+  /* Размер ведём от числа игроков. На троих-четверых подписей мало, и
+     мельчить незачем: лучей меньше - радиус больше. Чем больше игроков,
+     тем теснее кольцо подписей, поэтому фигура ужимается, освобождая им
+     место. Координатное поле при этом постоянное: меняются радиус и кегль,
+     а не масштаб всей картинки - иначе рост viewBox просто ужал бы всё
+     обратно при отрисовке по ширине колонки. */
+  var R  = n<=4 ? 73 : n<=6 ? 68 : 61;
+  var FS = n<=4 ? 13 : n<=6 ? 11.5 : 10.5;
+  /* Кольцо подписей: чем крупнее фигура, тем ближе подписи к лучам —
+     иначе длинное имя у горизонтального луча упирается в край поля. */
+  var LR = n<=4 ? 1.16 : 1.26;
+  /* Поле 330×270 при такой же ширине на экране: один к одному в пикселях.
+     Прежние 250 не вмещали длинных имён — подпись по краю уезжала за
+     границу viewBox и обрезалась. Запас по бокам считается по худшему
+     случаю: имя до 14 знаков, прижатое к правому лучу. */
+  var W=330,H=270,cx=W/2,cy=H/2+4,parts=[],labels=[];
   function pt(i,f){ var a=-Math.PI/2+i*(2*Math.PI/n); return [cx+Math.cos(a)*R*f, cy+Math.sin(a)*R*f]; }
   [1/3,2/3,1].forEach(function(f){
     var d=order.map(function(_,i){ var p=pt(i,f); return p[0].toFixed(1)+","+p[1].toFixed(1); }).join(" ");
@@ -3008,13 +3026,15 @@ function radarSVG(players, pts){
   order.forEach(function(p,i){
     var q=pt(i,(m[p.id]||0)/max);
     parts.push('<circle cx="'+q[0].toFixed(1)+'" cy="'+q[1].toFixed(1)+'" r="3.5" fill="#1F6FEB" stroke="#FAFCFF" stroke-width="2"/>');
-    var lp=pt(i,1.30), a=-Math.PI/2+i*(2*Math.PI/n), cos=Math.cos(a);
+    var lp=pt(i,LR), a=-Math.PI/2+i*(2*Math.PI/n), cos=Math.cos(a);
     var anchor=cos>0.25?"start":(cos<-0.25?"end":"middle");
-    labels.push('<text x="'+lp[0].toFixed(1)+'" y="'+lp[1].toFixed(1)+'" text-anchor="'+anchor+'" font-family="Archivo, sans-serif" font-size="10.5" font-weight="600" fill="#141820">'+esc(p.name)+'</text>'+
-      '<text x="'+lp[0].toFixed(1)+'" y="'+(lp[1]+11).toFixed(1)+'" text-anchor="'+anchor+'" font-family="JetBrains Mono, monospace" font-size="10" fill="#5A6472">'+(m[p.id]||0)+'</text>');
+    labels.push('<text x="'+lp[0].toFixed(1)+'" y="'+lp[1].toFixed(1)+'" text-anchor="'+anchor+'" font-family="Archivo, sans-serif" font-size="'+FS+'" font-weight="600" fill="#141820">'+esc(p.name)+'</text>'+
+      '<text x="'+lp[0].toFixed(1)+'" y="'+(lp[1]+FS+0.5).toFixed(1)+'" text-anchor="'+anchor+'" font-family="JetBrains Mono, monospace" font-size="'+(FS-1)+'" fill="#5A6472">'+(m[p.id]||0)+'</text>');
   });
-  parts.push('<text x="'+(cx+3)+'" y="'+(cy-R+1)+'" font-family="JetBrains Mono, monospace" font-size="8.5" fill="#8A94A4">'+max+'</text>');
-  return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="max-width:250px" role="img" aria-label="Очки игроков">'+parts.join("")+labels.join("")+'</svg>';
+  /* Метки максимума у верхнего луча больше нет: внешнее кольцо всегда равно
+     очкам лидера, а они и так подписаны у его вершины. Две одинаковые цифры
+     ложились одна на другую, и с укрупнённым кеглем это стало заметно. */
+  return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="max-width:330px" role="img" aria-label="Очки игроков">'+parts.join("")+labels.join("")+'</svg>';
 }
 
 /* ------------------------------------------------------------
@@ -3401,7 +3421,7 @@ function renderResults(){
         st.fastest ? esc(wtext(st.fastest.wordId)) : null,
         st.fastest ? esc(pname(st.fastest.gu))+" · "+dec(st.fastest.ms/1000)+" с" : null)+
     '</div>'+
-    '<div class="radarwrap"><div class="sechead">Итоговый расклад</div>'+radarSVG()+'</div>';
+    '<div class="radarwrap"><div class="sechead">Итоговый расклад очков</div>'+radarSVG()+'</div>';
 
   el.innerHTML =
     '<div class="tabwrap">'+segHTML("res-tabs",["Счёт","Журнал"], isLog?"Журнал":"Счёт")+'</div>'+
