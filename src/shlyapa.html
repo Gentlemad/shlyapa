@@ -140,6 +140,9 @@
      как один. */
   #app > .mesh{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden;
     opacity:var(--calm,.7)}
+  /* display:none, а не opacity: у невидимого элемента анимации не тикают,
+     и на «тихих» экранах слой не стоит вообще ничего. */
+  #app:not(.lush) > .mesh{display:none}
   #app > .mesh i{position:absolute;display:block;border-radius:50%;
     will-change:transform,opacity}
   #app.playing .ctx{background:transparent}
@@ -1128,7 +1131,7 @@ var TELEGRAM_URL = "https://t.me/gentlemad";
 /* Номер версии правится руками при выпуске, вместе с записью в
    docs/CHANGELOG.md. Отметку сборки к нему приклеивает build.js: по версии
    понятно, что человек видел, по дате - какая именно сборка у него открыта. */
-var VERSION = "0.11";
+var VERSION = "0.12";
 var BUILD = "dev";
 var FB_STORE = "shlyapa.fb.v1";
 var FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
@@ -3819,9 +3822,16 @@ function go(){
   paintedPhase = S.phase;
 
   var playing = ["handoff","turn","review"].indexOf(S.phase) >= 0;
-  var lit = playing || S.phase === "home";
+  /* Нарядный фон — там, где человек переживает момент: витрина, передача
+     телефона, ход, итог хода и итог партии. На настройке, вводе слов, в
+     правилах и в архиве партий он мешает: там работают с информацией, и
+     цвет под таблицей или под полем ввода только отвлекает.
+     Точки и цветной слой ходят вместе: два разных правила для одного фона
+     разъезжаются при первой же правке. */
+  var lush = ["home","handoff","turn","review","results"].indexOf(S.phase) >= 0;
   byId("app").classList.toggle("playing", playing);
-  dotsOn(lit);
+  byId("app").classList.toggle("lush", lush);
+  dotsOn(lush);
   if(S.phase !== "home"){ clearInterval(hatTimer); hatTimer = null; }
   if(S.phase !== "entry") stopHints();
 
