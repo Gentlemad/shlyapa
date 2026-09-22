@@ -21,6 +21,8 @@
     --line:#CAD2DE; --line-strong:#A1ABBB;
     --accent:#1F6FEB; --accent-2:#5AA9F7; --accent-soft:rgba(31,111,235,.12);
     --ok:#2E9E74; --danger:#D9483B; --gold:#D9A21B; --violet:#7A5AF5;
+    /* объёмный герой главного экрана: верх, низ и жемчужный акцент */
+    --hat-top:#9B7BFF; --hat-bot:#2C6BF0; --hat-acc:#C3B6F0;
     --shadow:0 1px 2px rgba(20,24,32,.06), 0 10px 26px rgba(20,24,32,.10);
     --ui:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;
     --mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
@@ -780,7 +782,7 @@
   .hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
     text-align:center;gap:2px;padding:10px 0 18px}
   /* головные уборы сменяют друг друга, по касанию подпрыгивают */
-  .hatstack{position:relative;width:96px;height:96px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .hatstack{position:relative;width:148px;height:148px;cursor:pointer;-webkit-tap-highlight-color:transparent}
   .hatstack.bump{animation:bump .45s cubic-bezier(.2,1.4,.4,1)}
   @keyframes bump{0%{transform:scale(1)}34%{transform:scale(1.13) rotate(-6deg)}100%{transform:scale(1)}}
   .hatstack .hi{position:absolute;inset:0;color:var(--accent);opacity:0;
@@ -788,6 +790,17 @@
     transition:opacity .42s ease, transform .42s cubic-bezier(.2,.9,.3,1)}
   .hatstack .hi.on{opacity:1;transform:none}
   .hatstack .hi svg{width:100%;height:100%}
+  /* объёмный слой ложится поверх значков и проявляется, когда готов */
+  .hatstack .h3d{position:absolute;inset:0;width:100%;height:100%;display:block;
+    opacity:0;transition:opacity .55s ease}
+  .hatstack.on3d .h3d{opacity:1}
+  .hatstack.on3d .hi,.hatstack.on3d .hi.on{opacity:0;transform:none;
+    transition:opacity .35s ease}
+  /* контактная тень: без неё фигура висит в воздухе, а не стоит */
+  .hatstack.on3d::after{content:"";position:absolute;left:50%;bottom:10px;
+    width:54%;height:11px;transform:translateX(-50%);border-radius:50%;
+    pointer-events:none;background:radial-gradient(ellipse at center,
+      rgba(58,42,132,.26) 0%,rgba(58,42,132,.13) 45%,rgba(58,42,132,0) 72%)}
 
   .hero{animation:heroFloat 5.2s ease-in-out infinite}
   @keyframes heroFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
@@ -913,6 +926,553 @@
   </div>
 </div>
 
+<script>
+/* Объёмные головные уборы для главного экрана.
+
+   Поверхности заданы формулами расстояния (SDF) и считаются лучом прямо в
+   пикселе, поэтому полигонов нет вовсе: силуэт остаётся гладким на любом
+   экране и при любом увеличении. Библиотека не нужна - весь рендер ниже.  */
+(function(global){
+  "use strict";
+
+  var VERT =
+    "attribute vec2 a;void main(){gl_Position=vec4(a,0.0,1.0);}";
+
+  var FRAG = [
+"precision highp float;",
+"uniform vec2 uRes;",
+"uniform float uTime;",
+"uniform float uSpin;",
+"uniform float uTiltX;",
+"uniform float uTiltZ;",
+"uniform float uA;",
+"uniform float uB;",
+"uniform float uMix;",
+"uniform float uScale;",
+"uniform vec3 uTop;",
+"uniform vec3 uBot;",
+"uniform vec3 uAcc;",
+"#define PI 3.14159265",
+
+"mat2 rot(float a){ float c=cos(a), s=sin(a); return mat2(c,-s,s,c); }",
+
+"float smin(float a,float b,float k){ float h=clamp(0.5+0.5*(b-a)/k,0.0,1.0); return mix(b,a,h)-k*h*(1.0-h); }",
+"float smax(float a,float b,float k){ return -smin(-a,-b,k); }",
+
+"float sdSphere(vec3 p,float r){ return length(p)-r; }",
+
+"float sdRoundCyl(vec3 p,float r,float h,float rb){",
+"  vec2 d=vec2(length(p.xz)-(r-rb), abs(p.y)-(h-rb));",
+"  return min(max(d.x,d.y),0.0)+length(max(d,0.0))-rb;",
+"}",
+
+"float sdRoundCone(vec3 p,float r1,float r2,float h){",
+"  vec2 q=vec2(length(p.xz),p.y);",
+"  float b=(r1-r2)/h;",
+"  float a=sqrt(max(1.0-b*b,0.0));",
+"  float k=dot(q,vec2(-b,a));",
+"  if(k<0.0) return length(q)-r1;",
+"  if(k>a*h) return length(q-vec2(0.0,h))-r2;",
+"  return dot(q,vec2(a,b))-r1;",
+"}",
+
+"float sdEllipsoid(vec3 p,vec3 r){",
+"  float k0=length(p/r); float k1=length(p/(r*r));",
+"  return k0*(k0-1.0)/max(k1,1e-5);",
+"}",
+
+"float sdTorus(vec3 p,vec2 t){ vec2 q=vec2(length(p.xz)-t.x,p.y); return length(q)-t.y; }",
+
+"vec2 opU(vec2 a,vec2 b){ return a.x<b.x?a:b; }",
+
+/* ---- цилиндр ---- */
+"vec2 hatTop(vec3 p){",
+"  vec3 q=p; q.xz/=(1.0+0.055*p.y);",
+"  float crown=sdRoundCyl(q-vec3(0.0,0.62,0.0),0.50,0.56,0.075)*0.94;",
+"  vec3 b=p; float rr=clamp(length(p.xz)/0.94,0.0,1.0); b.y-=0.06*rr*rr;",
+"  float brim=sdRoundCyl(b-vec3(0.0,0.03,0.0),0.94,0.042,0.038);",
+"  float body=smin(crown,brim,0.05);",
+"  float band=sdRoundCyl(p-vec3(0.0,0.18,0.0),0.536,0.085,0.028);",
+"  return vec2(body,band);",
+"}",
+
+/* ---- колпак ---- */
+"vec2 hatCone(vec3 p){",
+"  vec3 q=p;",
+"  float t=clamp(q.y/1.32,0.0,1.0);",
+"  q.x-=0.155*t*t;",
+"  q.xz/=(1.0-0.13*sin(PI*t));",
+"  float cone=sdRoundCone(q-vec3(0.0,0.02,0.0),0.56,0.05,1.30)*0.82;",
+"  cone=smax(cone,-(p.y-0.012),0.03);",
+"  vec3 b=p; float rr=clamp(length(p.xz)/0.82,0.0,1.0); b.y-=0.10*rr*rr;",
+"  float brim=sdRoundCyl(b-vec3(0.0,0.035,0.0),0.82,0.046,0.042);",
+"  float body=smin(cone,brim,0.10);",
+"  float pom=sdSphere(p-vec3(0.155,1.315,0.0),0.115);",
+"  return vec2(body,pom);",
+"}",
+
+/* ---- корона ----
+   Зубцы не приставлены к ободу, а вырезаны из него: так у короны единый
+   силуэт, а не «свечки на торте». */
+"vec2 hatCrown(vec3 p){",
+"  float band=sdRoundCyl(p-vec3(0.0,0.36,0.0),0.60,0.42,0.05);",
+"  float a=atan(p.z,p.x);",
+"  float sect=2.0*PI/6.0;",
+"  float i=floor(a/sect+0.5);",
+"  float ra=a-i*sect;",
+"  float rad=length(p.xz);",
+"  vec3 sp=vec3(rad*sin(ra),p.y,rad*cos(ra));",
+"  float notch=sdRoundCone(vec3(sp.x,1.12-sp.y,sp.z-0.66),0.42,0.02,0.68);",
+"  band=smax(band,-notch,0.035);",
+"  float hollow=sdRoundCyl(p-vec3(0.0,1.02,0.0),0.50,0.40,0.05);",
+"  band=smax(band,-hollow,0.04);",
+"  float rim=sdRoundCyl(p-vec3(0.0,0.0,0.0),0.628,0.042,0.04);",
+"  float j=floor(a/sect);",
+"  float rb=a-(j+0.5)*sect;",
+"  vec3 gp=vec3(rad*sin(rb),p.y,rad*cos(rb));",
+"  float tip=sdSphere(vec3(gp.x,gp.y-0.795,gp.z-0.60),0.082);",
+"  float stud=1e5;",
+"  return vec2(band,min(min(rim,tip),stud));",
+"}",
+
+/* ---- кепка ---- */
+"vec2 hatCap(vec3 p){",
+"  vec3 q=p; q.y/=0.80;",
+"  float dome=sdSphere(q-vec3(0.0,0.10,0.0),0.645)*0.80;",
+"  dome=smax(dome,-(p.y-0.05),0.05);",
+"  vec3 v=p-vec3(0.0,0.055,0.50);",
+"  float f=clamp((p.z-0.10)/0.72,0.0,1.0);",
+"  v.y+=0.20*f*f;",
+"  float visor=sdEllipsoid(v,vec3(0.72,0.068,0.46));",
+"  float body=smin(dome,visor,0.10);",
+"  float band=sdRoundCyl(p-vec3(0.0,0.075,0.0),0.655,0.055,0.05);",
+"  body=smin(body,band,0.05);",
+"  float btn=sdSphere(p-vec3(0.0,0.60,0.0),0.072);",
+"  return vec2(body,btn);",
+"}",
+
+"float hatH(float id){",
+"  if(id<0.5) return 1.44;",
+"  if(id<1.5) return 1.44;",
+"  if(id<2.5) return 0.90;",
+"  return 0.70;",
+"}",
+
+"vec2 hatAt(float id,vec3 p){",
+"  if(id<0.5) return hatTop(p);",
+"  if(id<1.5) return hatCone(p);",
+"  if(id<2.5) return hatCrown(p);",
+"  return hatCap(p);",
+"}",
+
+"vec3 w2o(vec3 v){",
+"  v.yz=rot(-uTiltX)*v.yz;",
+"  v.xy=rot(-uTiltZ)*v.xy;",
+"  v.xz=rot(-uSpin)*v.xz;",
+"  return v;",
+"}",
+"vec3 o2w(vec3 v){",
+"  v.xz=rot(uSpin)*v.xz;",
+"  v.xy=rot(uTiltZ)*v.xy;",
+"  v.yz=rot(uTiltX)*v.yz;",
+"  return v;",
+"}",
+
+"vec2 map(vec3 pw){",
+"  vec3 p=w2o(pw)/uScale;",
+"  vec2 r=hatAt(uA,p);",
+"  if(uMix>0.001){",
+"    r=mix(r,hatAt(uB,p),uMix);",
+/* прибавка к расстоянию съедает форму изнутри: на время перехода мелочь
+   уходит в тело, а не висит отдельными крошками */
+"    r.y+=0.55*sin(PI*uMix);",
+"  }",
+"  float d=min(r.x,r.y);",
+"  return vec2(d*uScale, r.y<r.x?2.0:1.0);",
+"}",
+
+"vec3 calcNormal(vec3 p){",
+"  vec2 e=vec2(1.0,-1.0)*0.0014;",
+"  return normalize(e.xyy*map(p+e.xyy).x+e.yyx*map(p+e.yyx).x+e.yxy*map(p+e.yxy).x+e.xxx*map(p+e.xxx).x);",
+"}",
+
+"float softShadow(vec3 ro,vec3 rd){",
+"  float res=1.0, t=0.04;",
+"  for(int i=0;i<14;i++){",
+"    float h=map(ro+rd*t).x;",
+"    res=min(res,10.0*h/t);",
+"    t+=clamp(h,0.012,0.14);",
+"    if(res<0.02||t>2.4) break;",
+"  }",
+"  return clamp(res,0.0,1.0);",
+"}",
+
+"float calcAO(vec3 p,vec3 n){",
+"  float occ=0.0, sca=1.0;",
+"  for(int i=0;i<4;i++){",
+"    float h=0.018+0.13*float(i)/3.0;",
+"    occ+=(h-map(p+n*h).x)*sca;",
+"    sca*=0.72;",
+"  }",
+"  return clamp(1.0-2.6*occ,0.0,1.0);",
+"}",
+
+/* Окружение задано формулой: сверху светлый проём, снизу глубокий синий,
+   сбоку фиолетовый отсвет. Отражения берутся отсюда - карты не нужны. */
+"vec3 envCol(vec3 rd){",
+"  float y=rd.y*0.5+0.5;",
+"  vec3 c=mix(vec3(0.045,0.055,0.13),vec3(0.42,0.46,0.70),smoothstep(0.0,0.55,y));",
+"  c=mix(c,vec3(1.30,1.33,1.42),smoothstep(0.60,1.0,y));",
+"  float w=pow(max(dot(rd,normalize(vec3(-0.42,0.74,0.52))),0.0),22.0);",
+"  c+=vec3(2.35,2.32,2.45)*w;",
+"  float v=pow(max(dot(rd,normalize(vec3(0.88,-0.10,0.30))),0.0),7.0);",
+"  c+=vec3(0.60,0.30,1.15)*v*0.7;",
+"  return c;",
+"}",
+
+"vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.0,1.0); }",
+
+"void main(){",
+"  vec2 uv=(gl_FragCoord.xy-0.5*uRes)/uRes.y;",
+"  vec3 ro=vec3(0.0,2.45,8.60);",
+"  vec3 ta=vec3(0.0,0.56,0.0);",
+"  vec3 ww=normalize(ta-ro);",
+"  vec3 uu=normalize(cross(ww,vec3(0.0,1.0,0.0)));",
+"  vec3 vv=cross(uu,ww);",
+"  vec3 rd=normalize(uv.x*uu+uv.y*vv+3.85*ww);",
+
+/* Фон отсекаем сферой вокруг фигуры: иначе каждый пустой пиксель гонит
+   луч через всю сцену, а таких пикселей больше половины кадра. */
+"  vec3 oc=ro-vec3(0.0,0.70*uScale,0.0);",
+"  float br=1.36*uScale;",
+"  float bb=dot(oc,rd);",
+"  float bc=dot(oc,oc)-br*br;",
+"  float bd=bb*bb-bc;",
+"  if(bd<0.0){ gl_FragColor=vec4(0.0); return; }",
+"  bd=sqrt(bd);",
+"  float tIn=max(-bb-bd,0.0), tOut=-bb+bd;",
+"  if(tOut<=0.0){ gl_FragColor=vec4(0.0); return; }",
+
+"  float t=tIn; float hit=0.0; float mat=1.0;",
+"  float stepK=(uMix>0.001&&uMix<0.999)?0.70:0.92;",
+"  for(int i=0;i<64;i++){",
+"    vec3 p=ro+rd*t;",
+"    vec2 h=map(p);",
+"    if(h.x<0.0007*t){ hit=1.0; mat=h.y; break; }",
+"    t+=h.x*stepK;",
+"    if(t>tOut) break;",
+"  }",
+
+"  if(hit<0.5){ gl_FragColor=vec4(0.0); return; }",
+
+"  vec3 p=ro+rd*t;",
+"  vec3 n=calcNormal(p);",
+"  vec3 po=w2o(p)/uScale;",
+
+"  vec3 key=normalize(vec3(-0.55,0.92,0.62));",
+"  vec3 rim=normalize(vec3(0.75,0.18,-0.70));",
+"  vec3 fil=normalize(vec3(0.60,0.30,0.72));",
+
+"  float sha=softShadow(p+n*0.02,key);",
+"  float ao=calcAO(p,n);",
+
+"  float hgt=mix(hatH(uA),hatH(uB),uMix);",
+"  vec3 base=mix(uBot,uTop,smoothstep(-0.14,1.02,po.y/hgt));",
+"  float rough=0.155;",
+"  if(mat>1.5){ base=uAcc; rough=0.11; }",
+
+"  float ndl=max(dot(n,key),0.0);",
+"  float ndv=max(dot(n,-rd),0.0);",
+"  vec3 hv=normalize(key-rd);",
+"  float ndh=max(dot(n,hv),0.0);",
+"  float spec=pow(ndh,mix(40.0,900.0,1.0-rough));",
+"  float coat=pow(ndh,2400.0);",
+"  float fres=pow(1.0-ndv,4.5);",
+
+"  vec3 refl=o2w(reflect(rd,n));",
+"  vec3 env=envCol(refl);",
+"  vec3 amb=envCol(o2w(n));",
+
+"  vec3 col=base*(0.30*amb+vec3(0.92)*ndl*sha*0.78);",
+"  col+=base*max(dot(n,fil),0.0)*0.22;",
+"  col+=env*(0.075+0.36*fres);",
+"  col+=vec3(1.0,0.99,1.0)*spec*sha*1.15;",
+"  col+=vec3(1.0)*coat*sha*0.7;",
+"  col+=vec3(0.66,0.55,1.35)*pow(max(dot(n,rim),0.0),2.4)*0.50;",
+"  col*=mix(0.55,1.0,ao);",
+
+"  col=aces(col*1.02);",
+"  col=pow(col,vec3(1.0/2.2));",
+"  gl_FragColor=vec4(col,1.0);",
+"}"
+  ].join("\n");
+
+  function compile(gl, type, src){
+    var s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)){
+      if(global.console && console.warn) console.warn(gl.getShaderInfoLog(s));
+      return null;
+    }
+    return s;
+  }
+
+  function hexToRgb(h){
+    h = String(h||"").trim().replace("#","");
+    if(h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+    var n = parseInt(h, 16);
+    if(isNaN(n)) return [0.5,0.5,0.5];
+    /* в линейное пространство: свет складывается там, а не в sRGB */
+    return [((n>>16)&255)/255, ((n>>8)&255)/255, (n&255)/255].map(function(c){
+      return Math.pow(c, 2.2);
+    });
+  }
+
+  function create(canvas, opts){
+    opts = opts || {};
+    var gl = null;
+    try{
+      var attrs = {alpha:true, premultipliedAlpha:false, antialias:false,
+        depth:false, stencil:false, powerPreference:"low-power",
+        failIfMajorPerformanceCaveat:false};
+      gl = canvas.getContext("webgl", attrs) || canvas.getContext("experimental-webgl", attrs);
+    }catch(e){ gl = null; }
+    if(!gl) return null;
+
+    var vs = compile(gl, gl.VERTEX_SHADER, VERT);
+    var fs = compile(gl, gl.FRAGMENT_SHADER, FRAG);
+    if(!vs || !fs) return null;
+    var prog = gl.createProgram();
+    gl.attachShader(prog, vs); gl.attachShader(prog, fs);
+    gl.bindAttribLocation(prog, 0, "a");
+    gl.linkProgram(prog);
+    if(!gl.getProgramParameter(prog, gl.LINK_STATUS)) return null;
+    gl.useProgram(prog);
+
+    var buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+    var U = {};
+    ["uRes","uTime","uSpin","uTiltX","uTiltZ","uA","uB","uMix","uScale","uTop","uBot","uAcc"]
+      .forEach(function(k){ U[k] = gl.getUniformLocation(prog, k); });
+
+    var top = hexToRgb(opts.top || "#9B7BFF");
+    var bot = hexToRgb(opts.bot || "#2C6BF0");
+    var acc = hexToRgb(opts.acc || "#DCD3FF");
+    gl.uniform3f(U.uTop, top[0], top[1], top[2]);
+    gl.uniform3f(U.uBot, bot[0], bot[1], bot[2]);
+    gl.uniform3f(U.uAcc, acc[0], acc[1], acc[2]);
+
+    var api = {
+      count: 4,
+      spin: 0.55,
+      a: 0, b: 1, mix: 0,
+      scale: 1,
+      dead: false
+    };
+
+    api.resize = function(cssW, cssH, ratio){
+      var s = ratio || Math.min(3, Math.max(2, global.devicePixelRatio || 1));
+      var w = Math.max(1, Math.round(cssW * s));
+      var h = Math.max(1, Math.round(cssH * s));
+      if(canvas.width !== w || canvas.height !== h){
+        canvas.width = w; canvas.height = h;
+      }
+      gl.viewport(0, 0, w, h);
+      gl.uniform2f(U.uRes, w, h);
+    };
+
+    api.draw = function(time){
+      gl.uniform1f(U.uTime, time);
+      gl.uniform1f(U.uSpin, api.spin);
+      gl.uniform1f(U.uTiltX, -0.045 + 0.030 * Math.sin(time * 0.47));
+      gl.uniform1f(U.uTiltZ, 0.028 * Math.sin(time * 0.61 + 1.1));
+      gl.uniform1f(U.uA, api.a);
+      gl.uniform1f(U.uB, api.b);
+      gl.uniform1f(U.uMix, api.mix);
+      gl.uniform1f(U.uScale, api.scale);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    };
+
+    api.lost = function(){ return gl.isContextLost(); };
+
+    api.dispose = function(){
+      api.dead = true;
+      try{
+        var ext = gl.getExtension("WEBGL_lose_context");
+        if(ext) ext.loseContext();
+      }catch(e){}
+    };
+    return api;
+  }
+
+  /* Живой слой: вращение, смена типов и реакция на касание.
+     Собран отдельно от рендера, чтобы правила движения читались без шейдера. */
+  function attach(host, opts){
+    opts = opts || {};
+    if(!host || !global.WebGLRenderingContext) return null;
+
+    var canvas = document.createElement("canvas");
+    canvas.className = "h3d";
+    canvas.setAttribute("aria-hidden", "true");
+    var r = create(canvas, opts);
+    if(!r) return null;
+    host.appendChild(canvas);
+
+    var count = opts.count || 4;
+    var wait = (opts.interval || 2700) / 1000;
+    var MORPH = 0.78;
+
+    var reduced = false;
+    try{ reduced = global.matchMedia("(prefers-reduced-motion:reduce)").matches; }catch(e){}
+
+    var idx = opts.start || 0;
+    var nxt = (idx + 1) % count;
+    r.a = idx; r.b = nxt; r.mix = 0;
+
+    var acc = 0, morph = -1, extra = 0, pop = 0, clock = 0;
+    var raf = 0, last = 0, alive = true;
+    /* Качество снижаем ступенями: лучше потерять резкость, чем плавность.
+       Меряем не один раз на старте, а окнами - телефон греется и слабеет. */
+    var TIERS = [2, 1.5, 1.15];
+    var tier = 0;
+    var ratio = Math.min(TIERS[0], Math.max(1, global.devicePixelRatio || 1));
+    var probes = 0, slow = 0, cw = 0, ch = 0, minGap = 0, skip = 0, idle = false;
+
+    function fit(){
+      var w = host.clientWidth || 128;
+      var h = host.clientHeight || w;
+      if(w !== cw || h !== ch){ cw = w; ch = h; }
+      r.resize(w, h, ratio);
+    }
+
+    function visible(){
+      if(!alive || r.dead) return false;
+      if(global.document && global.document.hidden) return false;
+      return host.offsetParent !== null;
+    }
+
+    function startSwitch(){
+      if(morph >= 0) return;
+      morph = 0;
+      nxt = (idx + 1) % count;
+      r.a = idx; r.b = nxt;
+    }
+
+    function step(now){
+      if(!alive) return;
+      if(r.lost()){ stop(); if(opts.onLost) opts.onLost(); return; }
+      if(!visible()){ stop(); return; }
+
+      raf = global.requestAnimationFrame(step);
+      var dt = last ? Math.min(0.05, (now - last) / 1000) : 0.016;
+      last = now;
+      clock += dt;
+
+      if(probes < 30){
+        probes++;
+        if(dt > 0.026) slow++;
+      }else{
+        if(slow > 15 && tier < TIERS.length - 1){
+          tier++;
+          ratio = Math.min(TIERS[tier], Math.max(1, global.devicePixelRatio || 1));
+          /* на нижней ступени добираем запас частотой: 30 кадров в секунду
+             на медленном повороте глаз не ловит, рывки - ловит */
+          if(tier === TIERS.length - 1) minGap = 1 / 32;
+          fit();
+        }
+        probes = 0; slow = 0;
+      }
+
+      extra *= Math.exp(-dt * 3.4);
+      pop *= Math.exp(-dt * 5.2);
+      if(!reduced) r.spin += (0.40 + extra) * dt;
+      else r.spin += extra * dt;
+
+      acc += dt;
+      if(morph < 0 && !reduced && acc >= wait) startSwitch();
+
+      var breath = 0;
+      if(morph >= 0){
+        morph += dt / MORPH;
+        if(morph >= 1){
+          idx = nxt; nxt = (idx + 1) % count;
+          morph = -1; acc = 0;
+          r.a = idx; r.b = nxt; r.mix = 0;
+        }else{
+          var e = morph * morph * (3 - 2 * morph);
+          r.mix = e;
+          breath = Math.sin(Math.PI * morph);
+        }
+      }
+      r.scale = (1 - 0.06 * breath) * (1 + 0.11 * pop);
+
+      /* При пониженной анимации фигура стоит. Гонять ради неподвижной
+         картинки видеокарту каждый кадр незачем - рисуем только на сдвиг. */
+      if(reduced){
+        if(morph < 0 && pop < 0.004 && extra < 0.004){
+          if(idle) return;
+          idle = true;
+        }else idle = false;
+      }
+
+      /* Пропускаем только отрисовку: состояние движения считается каждый
+         кадр, иначе поворот замедлился бы вместе с частотой. */
+      if(minGap){
+        skip += dt;
+        if(skip < minGap) return;
+        skip = 0;
+      }
+      r.draw(reduced ? 0.8 : clock);
+    }
+
+    function start(){
+      if(raf || !alive) return;
+      if(!visible()) return;
+      fit();
+      last = 0;
+      raf = global.requestAnimationFrame(step);
+    }
+    function stop(){
+      if(raf) global.cancelAnimationFrame(raf);
+      raf = 0;
+    }
+
+    function onVis(){ if(visible()) start(); else stop(); }
+    if(global.document) global.document.addEventListener("visibilitychange", onVis);
+    global.addEventListener("resize", fit);
+    canvas.addEventListener("webglcontextlost", function(ev){
+      ev.preventDefault(); alive = false; stop();
+      if(opts.onLost) opts.onLost();
+    });
+
+    fit();
+    start();
+
+    return {
+      el: canvas,
+      index: function(){ return idx; },
+      next: function(){ startSwitch(); acc = 0; },
+      bump: function(){ extra += 4.6; pop = 1; startSwitch(); acc = 0; },
+      poke: start,
+      dispose: function(){
+        alive = false; stop();
+        if(global.document) global.document.removeEventListener("visibilitychange", onVis);
+        global.removeEventListener("resize", fit);
+        r.dispose();
+        if(canvas.parentNode) canvas.parentNode.removeChild(canvas);
+      }
+    };
+  }
+
+  global.Hat3D = {create: create, attach: attach};
+})(window);
+</script>
+
 <script>window.Ionic = { config: { mode: "ios", animated: true } };</script>
 <script type="module" src="https://cdn.jsdelivr.net/npm/@ionic/core@9.0.1/dist/ionic/ionic.esm.js"></script>
 <script nomodule src="https://cdn.jsdelivr.net/npm/@ionic/core@9.0.1/dist/ionic/ionic.js"></script>
@@ -1004,8 +1564,8 @@ var TELEGRAM_URL = "https://t.me/gentlemad";
 /* Номер версии правится руками при выпуске, вместе с записью в
    docs/CHANGELOG.md. Отметку сборки к нему приклеивает build.js: по версии
    понятно, что человек видел, по дате - какая именно сборка у него открыта. */
-var VERSION = "0.10";
-var BUILD = "0.10 · 2026-09-22 09:45 UTC";
+var VERSION = "0.11";
+var BUILD = "0.11 · 2026-09-22 13:15 UTC";
 var FB_STORE = "shlyapa.fb.v1";
 var FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
 /* Счётчик символов висит на экране без дела: показываем, только когда
@@ -1738,10 +2298,12 @@ function bindSeg(id, cb){
 /* ============================================================
    ЭКРАНЫ
    ============================================================ */
-var hatTimer=null, hatIdx=0;
+var hatTimer=null, hatIdx=0, hat3d=null;
 function mountHats(){
   var host=byId("hatstack");
   if(!host) return;
+  if(hat3d){ hat3d.dispose(); hat3d=null; }
+  host.classList.remove("on3d");
   host.innerHTML = HATS.map(function(h,i){
     return '<span class="hi'+(i===0?" on":"")+'">'+h+'</span>';
   }).join("");
@@ -1749,8 +2311,53 @@ function mountHats(){
   clearInterval(hatTimer);
   hatTimer = setInterval(nextHat, 2700);
   host.onclick = bumpHat;
+  mountHats3D(host);
+}
+
+/* Объём подключается после того, как экран уже нарисован: открытие главного
+   не ждёт ни байта, плоские значки видны сразу, а если WebGL недоступен или
+   контекст потерян - они же и остаются. Запасной путь убирать нельзя. */
+function mountHats3D(host){
+  if(!window.Hat3D) return;
+  var css = getComputedStyle(document.documentElement);
+  function v(name, dflt){
+    var x = (css.getPropertyValue(name) || "").trim();
+    return x || dflt;
+  }
+  var lost = false;
+  function drop(){
+    lost = true;
+    host.classList.remove("on3d");
+    hat3d = null;
+    var cv = host.querySelector("canvas.h3d");
+    if(cv && cv.parentNode) cv.parentNode.removeChild(cv);
+    clearInterval(hatTimer);
+    hatTimer = setInterval(nextHat, 2700);
+  }
+  function go(){
+    /* Пока ждали простоя, экран могли сменить и вернуть: тогда на главном
+       живёт уже другой узел, а этот оторван от документа. Рисовать в него -
+       значит погасить значки на живом экране и не показать ничего взамен. */
+    if(hat3d || byId("hatstack") !== host) return;
+    var ctl = window.Hat3D.attach(host, {
+      count: HATS.length,
+      interval: 2700,
+      top: v("--hat-top", "#9B7BFF"),
+      bot: v("--hat-bot", "#2C6BF0"),
+      acc: v("--hat-acc", "#C3B6F0"),
+      onLost: drop
+    });
+    /* контекст мог отвалиться прямо в момент создания */
+    if(!ctl || lost){ if(ctl) ctl.dispose(); return; }
+    hat3d = ctl;
+    clearInterval(hatTimer); hatTimer = null;
+    host.classList.add("on3d");
+  }
+  if(window.requestIdleCallback) requestIdleCallback(go, {timeout:700});
+  else setTimeout(go, 140);
 }
 function nextHat(){
+  if(hat3d){ hat3d.next(); return; }
   var host=byId("hatstack");
   if(!host || host.offsetParent === null){ clearInterval(hatTimer); hatTimer=null; return; }
   var items=host.querySelectorAll(".hi");
@@ -1762,8 +2369,10 @@ function nextHat(){
 function bumpHat(){
   var host=byId("hatstack");
   if(!host) return;
-  host.classList.remove("bump"); void host.offsetWidth; host.classList.add("bump");
   buzz(9);
+  /* в объёме подскок отыгрывает сам шейдер: css-трансформ растянул бы холст */
+  if(hat3d){ hat3d.bump(); return; }
+  host.classList.remove("bump"); void host.offsetWidth; host.classList.add("bump");
   nextHat();
   clearInterval(hatTimer);
   hatTimer = setInterval(nextHat, 2700);
