@@ -12,6 +12,12 @@
     --accent:#1F6FEB; --accent-2:#5AA9F7; --accent-soft:rgba(31,111,235,.12);
     --ok:#2E9E74; --danger:#D9483B; --gold:#D9A21B; --violet:#7A5AF5;
     --shadow:0 1px 2px rgba(20,24,32,.06), 0 10px 26px rgba(20,24,32,.10);
+    /* Тень белых карточек. Фон стал цветным и живым, и белая заливка на нём
+       перестала читаться как отдельный слой: карточка сливалась с фоном.
+       Два слоя: короткий контактный, чтобы край не расплывался, и мягкий
+       дальний, который и даёт отрыв от фона. Подобрано панелью, см.
+       docs/BACKGROUND.md. */
+    --cardshadow:0 1px 2px rgba(20,24,32,.05), 0 6px 18px rgba(20,24,32,.10);
     --ui:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;
     --mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
     --kbh:214px; --sbh:42px;
@@ -695,7 +701,7 @@
   .rdiv:after{content:"";flex:1;height:1px;background:var(--line)}
 
   /* журнал: заливка есть, обводки нет */
-  .acc{background:var(--raise);border-radius:12px;overflow:hidden}
+  .acc{background:var(--raise);border-radius:12px;overflow:hidden;box-shadow:var(--cardshadow)}
   .acc + .acc{margin-top:6px}
   .acchead{display:flex;align-items:center;gap:10px;width:100%;padding:11px 12px;
     border:0;background:none;cursor:pointer;text-align:left}
@@ -750,8 +756,11 @@
 
   /* титул это один блок: лейбл, значение, пояснение */
   .titles{display:flex;flex-direction:column;gap:10px}
+  /* Титулы - отдельный раздел, а не продолжение таблицы очков. Без
+     заголовка они читались как ещё четыре строки счёта. */
+  .titleshead{font-size:12px;font-weight:600;color:var(--faint);margin-bottom:-2px}
   .title{display:flex;flex-direction:column;gap:7px;align-items:flex-start;
-    background:var(--raise);border-radius:14px;padding:12px 13px 13px}
+    background:var(--raise);border-radius:14px;padding:12px 13px 13px;box-shadow:var(--cardshadow)}
   .tpill{display:inline-flex;align-items:center;gap:7px;border-radius:7px;
     padding:5px 10px;background:var(--tc);color:#fff;
     font-family:var(--ui);font-size:12.5px;font-weight:700}
@@ -788,6 +797,7 @@
   .hero p{max-width:250px}
   .homebtns{display:flex;flex-direction:column;gap:9px;align-items:stretch}
   .lastgame{background:var(--raise);border-radius:14px;padding:12px 13px;display:flex;
+    box-shadow:var(--cardshadow);
     flex-direction:column;gap:8px;text-align:left}
   .lastgame .lt{font-size:12px;font-weight:600;color:var(--faint)}
   .lastgame .lp{font-size:14px;line-height:1.35}
@@ -795,7 +805,8 @@
   .lastgame .lw b{color:var(--accent)}
 
   /* прошлые партии */
-  .histcard{background:var(--raise);border-radius:14px;padding:12px 13px;display:flex;flex-direction:column;gap:8px}
+  .histcard{background:var(--raise);border-radius:14px;padding:12px 13px;display:flex;flex-direction:column;gap:8px;
+    box-shadow:var(--cardshadow)}
   .histrow{display:flex;align-items:center;gap:10px}
   .histrow .hb{flex:1;min-width:0}
   .histcard .hd{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
@@ -1889,7 +1900,8 @@ function renderStats(){
           (g.settings ? '<div class="kv"><span class="k">Таймер</span><span class="v">'+num(g.settings.turnSeconds,"секунда","секунды","секунд")+'</span></div>' : '')+
         '</div>'+
         (t.bestPair || t.hardest || t.tough || t.fastest
-          ? '<div class="titles">'+
+          ? '<div class="titleshead">Достижения</div>'+
+            '<div class="titles">'+
               (t.bestPair ? titleBlock("blue", IC.duo, "Лучшая пара", t.bestPair.v, t.bestPair.d) : "")+
               (t.hardest ? titleBlock("gold", IC.lock, "Самое сложное слово", t.hardest.v, t.hardest.d) : "")+
               (t.tough ? titleBlock("violet", IC.shield, "Непробиваемый набор", t.tough.v, t.tough.d) : "")+
@@ -3109,7 +3121,7 @@ function renderReview(){
         }).join("")+'</div>' : '<div class="stub">За ход не сыграно ни одного слова</div>')+
       (t.startRound!==t.endRound
         ? '<div class="note">Ход прошёл через границу раунда: начался в '+t.startRound+', закончился в '+t.endRound+'.</div>' : '')+
-      '<div class="radarwrap"><div class="radarcap">расклад очков</div>'+radarSVG()+'</div>'+
+      '<div class="radarwrap"><div class="radarcap">Расклад очков</div>'+radarSVG()+'</div>'+
       '<div class="spacer"></div>'+
       '<div class="actions"><ion-button id="rnext" expand="block">'+
         (last?"Посмотреть результаты":"Начать следующий ход")+'</ion-button></div>'+
@@ -3222,7 +3234,7 @@ function renderSheet(){
           return '<div class="place"><span class="pos">'+(i+1)+'</span>'+
             '<span class="pn">'+esc(s.name)+'</span><span class="pp">'+s.pts+'</span></div>';
         }).join("")+'</div>'+
-        '<div class="radarwrap"><div class="radarcap">расклад очков</div>'+radarSVG()+'</div></div>';
+        '<div class="radarwrap"><div class="radarcap">Расклад очков</div>'+radarSVG()+'</div></div>';
 
   inner.innerHTML =
     '<div class="hdr"><div class="hside"></div><div class="htitle">Пауза</div>'+
@@ -3358,6 +3370,7 @@ function renderResults(){
       return '<div class="place'+(s.pts===top&&top>0?" win":"")+'"><span class="pos">'+(i+1)+'</span>'+
         '<span class="pn">'+esc(s.name)+'</span><span class="pp">'+s.pts+'</span></div>';
     }).join("")+'</div>'+
+    '<div class="titleshead">Достижения</div>'+
     '<div class="titles">'+
       tag("blue", IC.duo, "Лучшая пара",
         st.bestPair ? esc(pname(st.bestPair.a))+" и "+esc(pname(st.bestPair.b)) : null,
@@ -3372,7 +3385,7 @@ function renderResults(){
         st.fastest ? esc(wtext(st.fastest.wordId)) : null,
         st.fastest ? esc(pname(st.fastest.gu))+" · "+dec(st.fastest.ms/1000)+" с" : null)+
     '</div>'+
-    '<div class="radarwrap"><div class="radarcap">итоговый расклад</div>'+radarSVG()+'</div>';
+    '<div class="radarwrap"><div class="radarcap">Итоговый расклад</div>'+radarSVG()+'</div>';
 
   el.innerHTML =
     '<div class="tabwrap">'+segHTML("res-tabs",["Счёт","Журнал"], isLog?"Журнал":"Счёт")+'</div>'+
