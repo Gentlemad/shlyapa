@@ -322,17 +322,9 @@
   .dwbg .b4{width:64vmax;height:64vmax;right:-22vmax;bottom:-30vmax;
     background:radial-gradient(circle,rgba(31,111,235,.34) 0%,rgba(31,111,235,.13) 42%,rgba(31,111,235,0) 70%);
     animation:dwFloat4 29s ease-in-out infinite}
-  /* Тот же фон в размере карточки: пятна заданы долей блока, а не окна.
-     Порядок важен - специфичность та же, решает он. */
-  .dwbg-sm .b1{width:125%;height:125%;left:-48%;top:-42%}
-  .dwbg-sm .b2{width:115%;height:115%;right:-42%;top:-34%}
-  .dwbg-sm .b3{width:135%;height:135%;left:14%;bottom:-58%}
-  .dwbg-sm .b4{width:105%;height:105%;right:-34%;bottom:-44%}
-  /* Сердцевина мягче, чем на полном экране: в размере карточки прежняя
-     накрывала блок целиком и цвет пропадал совсем. */
-  .dwbg-sm::after{background:radial-gradient(circle at 50% 47%,
-    rgba(255,255,255,.88) 0%,rgba(255,255,255,.74) 26%,
-    rgba(255,255,255,.40) 52%,rgba(255,255,255,0) 80%)}
+  /* Отдельного, уменьшенного варианта нет намеренно: пятна размером в окно
+     попадают в карточку только краями, и переход получается длинным и
+     размытым. Уменьшенные пятна дают жёсткие границы - уже пробовали. */
 
   /* светлая сердцевина поверх пятен */
   .dwbg::after{content:"";position:absolute;inset:0;
@@ -1013,7 +1005,7 @@ var TELEGRAM_URL = "https://t.me/gentlemad";
    docs/CHANGELOG.md. Отметку сборки к нему приклеивает build.js: по версии
    понятно, что человек видел, по дате - какая именно сборка у него открыта. */
 var VERSION = "0.10";
-var BUILD = "0.10 · 2026-09-22 09:37 UTC";
+var BUILD = "0.10 · 2026-09-22 09:45 UTC";
 var FB_STORE = "shlyapa.fb.v1";
 var FB_MAX = 2000, FB_COOLDOWN_MS = 30000, FB_TIMEOUT_MS = 12000;
 /* Счётчик символов висит на экране без дела: показываем, только когда
@@ -2490,7 +2482,7 @@ function renderFeedback(){
       '<div class="sheetbody"><div class="fbdone">' +
         /* Тот же живой фон, что на предупреждении для компьютеров: цветные
            пятна к краям, светлая середина под текстом. */
-        '<div class="dwbg dwbg-sm" aria-hidden="true">' +
+        '<div class="dwbg" aria-hidden="true">' +
           '<i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i>' +
         '</div>' +
         '<div class="di">' + IC.check + '</div>' +
